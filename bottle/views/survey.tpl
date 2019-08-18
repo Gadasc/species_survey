@@ -12,9 +12,7 @@
 
 <h1>Macro Moths</h1>
 <p id="todays_date">
-<!-- <form id="mothsForm", autocomplete="off" action="/myapp" method="post"> -->
 <form id="mothsForm", autocomplete="off" action="/handle_survey" method="post">
-<!-- <form id="mothsForm", autocomplete="off" action="/cgi-bin/handle_survey.cgi"> -->
 <table id="demo">
 <tr id="headers"><th>Species</th><th>Rcnt</th><th>Count</th></tr>
 <tr id="moth_search">

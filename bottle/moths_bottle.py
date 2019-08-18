@@ -238,7 +238,7 @@ def serve_survey():
     refresh_manifest()
 
     try:
-        with open(f"../records/day_count_{today}.json") as json_in:
+        with open(f"{cfg['RECORDS_PATH']}day_count_{today}.json") as json_in:
             records = json.load(json_in)
     except  FileNotFoundError:
         records = {}
