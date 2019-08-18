@@ -5,16 +5,15 @@
 <meta http-equiv="cache-control" content="no-cache" />
 <title>Merrington House Moth Survey</title>
 <link rel="stylesheet" type="text/css" href="/static/autocomplete.css">
+<link rel="stylesheet" type="text/css" href="/static/mothmenu.css">
 </head>
 
 <body>
-
-
+% include("menu_moth.tpl")
 <h1>Macro Moths</h1>
 <p id="todays_date">
-<!-- <form id="mothsForm", autocomplete="off" action="/myapp" method="post"> -->
 <form id="mothsForm", autocomplete="off" action="/handle_survey" method="post">
-<!-- <form id="mothsForm", autocomplete="off" action="/cgi-bin/handle_survey.cgi"> -->
+Date: <input type="text" name="dash_date_str"  value="{{dash_date_str}}" readonly></p>
 <table id="demo">
 <tr id="headers"><th>Species</th><th>Rcnt</th><th>Count</th></tr>
 <tr id="moth_search">
@@ -37,7 +36,6 @@
 <script src="/static/manifest.js"></script>
 <script src="/static/autocomplete.js"></script>
 <script src="/static/common_names.js"></script>
-<script src="/static/post_form.js"></script>
 
 <script>
 

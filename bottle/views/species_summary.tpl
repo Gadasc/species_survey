@@ -10,9 +10,11 @@
 
 <body>
 % include("menu_moth.tpl")
-<h1>Latest Moth Catches</h1>
-<p> </p>
-{{!html_table}}
+<h1>{{title}}</h1>
+
+<div>
+{{!species_table}}
+</div>
 
 </body>
 </html>

@@ -1,0 +1,14 @@
+!.gitignore
+sql_config_local.py
+app_config_local.py
+sql_config_local.py
+*.db
+*.swp
+*.yaml
+static/manifest.js
+__pycache__/
+images/
+graphs/
+records/
+*_Exception.log
+

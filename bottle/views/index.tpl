@@ -5,12 +5,15 @@
 <meta http-equiv="cache-control" content="no-cache" />
 <title>Merrington House Moth Survey</title>
 <link rel="stylesheet" type="text/css" href="/static/autocomplete.css">
+<link rel="stylesheet" type="text/css" href="/static/mothmenu.css">
 </head>
 
 <body>
-
-
+% include("menu_moth.tpl")
 <h1>Home - Moths Survey</h1>
+<div>
+</div>
+<hr>
 <p id="todays_date">
 <form id="mothsForm", autocomplete="off" action="/species" method="get">
 <table id="demo">

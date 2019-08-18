@@ -10,9 +10,18 @@
 
 <body>
 % include("menu_moth.tpl")
-<h1>Latest Moth Catches</h1>
-<p> </p>
-{{!html_table}}
+<h1>{{species}}</h1>
+<div>{{!taxonomy}}</div>
+
+<div style="position: relative;">
+<img style="position: relative; top: 0px; left: 0px;" src="/graphs/{{species}}" />
+<img style="position: absolute; top: 0px; left: 0px;" src="/graphs/date_overlay" />
+</div>
+
+<div>
+{{!catches}}
+</div>
+
 
 </body>
 </html>
