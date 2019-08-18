@@ -42,6 +42,34 @@ GRAPH_PATH = cfg["GRAPH_PATH"]
 OVERLAY_FILE = cfg["OVERLAY_FILE"]
 STATIC_PATH = cfg["STATIC_PATH"]
 
+
+def refresh_manifest():
+    """ Check the javascript manifest.js file is up to date """
+    today = dt.date.today()
+    try:
+        if dt.date.fromtimestamp(os.path.getmtime(cfg["STATIC_PATH"]+cfg["MANIFEST_FILE"])) == today:
+            print ("Today's manifest exists - returning.")
+            return
+    except FileNotFoundError:
+        pass
+
+    # By getting here we have to update the manifest file.
+    # Get moths and quantity found in the last 2 weeks
+    cnx = mariadb.connect(**sql_config)
+    cursor = cnx.cursor()
+    cursor.execute(f"SELECT MothName species, sum(MothCount) recent FROM moth_records WHERE "
+                    "Date > DATE_ADD(NOW(), INTERVAL -14 DAY) GROUP BY species;")
+
+    records_dict = {row: line for row, line in enumerate(cursor)}
+    recent_df = pd.DataFrame.from_dict(records_dict, columns=["species", "recent"], orient='index')
+
+    # generate javascript file to be sent to broswers
+    with open(cfg["STATIC_PATH"]+cfg["MANIFEST_FILE"], 'w') as mout:
+        mout.write("var recent_moths  = [\n")
+        for _, r in recent_df.iterrows():
+            mout.write(f'    {{species:"{r.species}", recent:{r.recent}, count:0 }},\n')
+        mout.write("];")
+
 def update_moth_database(cursor, sql_date_string, dict_records):
     """ Update the mysql server with the latest records
     """
@@ -206,6 +234,8 @@ def service_static_file(filename):
 @app.route("/survey")
 def serve_survey():
     today = dt.date.today().strftime("%Y%m%d")
+    refresh_manifest()
+
     try:
         with open(f"../records/day_count_{today}.json") as json_in:
             records = json.load(json_in)
@@ -349,6 +379,7 @@ if __name__ == "__main__":
     bottle.run(app=app,
                debug=True,
                reloader=True,
-               host="localhost")
+               host=cfg["HOST"],
+               port=cfg["PORT"])
 
 

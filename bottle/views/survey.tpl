@@ -37,7 +37,6 @@
 <script src="/static/manifest.js"></script>
 <script src="/static/autocomplete.js"></script>
 <script src="/static/common_names.js"></script>
-<script src="/static/post_form.js"></script>
 
 <script>
 
