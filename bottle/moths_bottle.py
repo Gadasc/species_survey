@@ -10,6 +10,7 @@ appropriately and setting u+x permissions:
 
 History
 -------
+18 Aug 2019 - moving back to RPi and generating manifest file on the fly.
 15 Aug 2019 - Combining functions to update database
 13 Aug 2019 - Adding route page and working out how to add javascript
 20 Jul 2019 - starting to optimise so graphs aren't redrawn unless required.
