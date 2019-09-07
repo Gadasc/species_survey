@@ -1,0 +1,99 @@
+body {
+	font-family:"HelveticaNeue","Helvetica Neue",Helvetica,Arial,sans-serif;
+}
+
+h1 {
+	color:#7092BE;
+}
+
+.clearfix:after {
+     	clear:both;
+	overflow: auto;
+     	zoom: 1;
+	content: " "; 
+     	visibility: hidden;
+     	display: block;
+     	height: 0;
+}
+
+.top_menu UL{
+	position:relative;
+	float:left;
+	width: 100%;
+	left:0;
+	margin:0;
+	padding:0;
+}
+
+.top_menu LI{
+	list-style-type:none;  
+	width:120px;
+	background:#7092BE;
+	color:#FFFFFF;
+	float:left;
+	font-weight: bold;	
+	line-height:24pt;
+	text-align: center;
+	position: relative;
+}
+
+
+.top_menu A {
+	text-decoration: none;
+	color:#FFFFFF;
+	display: block;
+    font-size: 24px;
+}
+
+.top_menu UL UL {
+	padding:0;  
+	display:none;
+	z-index: 100;
+}
+
+.top_menu LI:hover {
+	background:#597498;
+}
+
+.top_menu UL LI:hover>UL {
+	position:absolute;
+	display:block;
+	z-index:100;
+}
+
+<!-- Fine tuning formating defines -->
+<!-- ----------------------------- -->
+<!-- Pull the over skeleton into a -->
+<!-- reusable file.                -->
+
+.top_menu LI{
+	font-family:"HelveticaNeue","Helvetica Neue",Helvetica,Arial,sans-serif;
+}
+
+.menu_ex {
+    background-color:#7092BE;
+    color: white;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+a.menu_ex:visited {
+    color: white;
+}
+
+img.stars {
+    vertical-align: middle;
+}
+
+.time {
+    text-decoration: none;
+	color:#7092BE;
+	background:#FFFFFF;
+    font-weight: bold;
+}
+.act_time {
+    text-decoration: none;
+	background:#7092BE;
+	color:#FFFFFF;
+    font-weight: bold;
+}

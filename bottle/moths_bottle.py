@@ -21,7 +21,7 @@ History
 
 from app_config import app_config as cfg
 import bottle
-from bottle import route, run, Bottle, template, static_file, request
+from bottle import route, run, Bottle, template, static_file, request, TEMPLATE_PATH
 import pandas as pd
 import mysql.connector as mariadb
 from sql_config import sql_config
@@ -33,6 +33,9 @@ from matplotlib.dates import MonthLocator, DateFormatter
 import os
 import json
 import html
+
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
+TEMPLATE_PATH.insert(0, os.getcwd()) 
 
 # Format information for plot
 plot_dict = {
@@ -102,9 +105,11 @@ def show_latest_moths(cursor):
     records_dict = {row: line for row, line in enumerate(cursor)}
 
     recent_df = pd.DataFrame.from_dict(records_dict, columns=columns, orient='index')
+    recent_df["MothName"] = recent_df["MothName"].apply(
+                                lambda mn: f'<a href="/species/{mn}">{mn}</a>')
     recent_df.set_index(["Date", "MothName"], inplace=True)
 
-    return recent_df.unstack("Date").fillna("").to_html()
+    return recent_df.unstack("Date").fillna("").to_html(escape=False, justify='left')
 
 
 
@@ -163,6 +168,20 @@ def graph_date_overlay():
     plt.close()
 
 
+def get_db_update_time():
+    """ Return a datetime.datetime object with the update time of the database
+    """
+    cnx = mariadb.connect(**sql_config)
+    cursor = cnx.cursor()
+    cursor.execute("SELECT update_time FROM information_schema.tables "
+                   f"WHERE table_schema = 'cold_ash_moths' "
+                   f"AND table_name = 'moth_records';")
+    print(cursor.column_names)
+    update_time = cursor.fetchone()[0] 
+    cursor.close()
+    cnx.close()
+    return update_time
+
 def graph_mothname_v2(mothname):
     catches_df = get_moth_catches(mothname)
 
@@ -217,23 +236,28 @@ app = Bottle()
 
 @app.route("/graphs/<species>")
 def server_graphs(species):
+    """ Helper route to return a graph image as a static file. """
     species = species.replace("%20", " ")
     return static_file(f"{species}.png", root=cfg["GRAPH_PATH"])
 
 
 @app.route("/")
 def index():
+    """ Landing page for the web site. """
     # Display a landing page
     return template("index.tpl")
 
 
 @app.route("/static/<filename>")
 def service_static_file(filename):
+    """ Help route to return static files. """
     return static_file(f"{filename}", root=cfg["STATIC_PATH"])
 
 
 @app.route("/survey")
 def serve_survey():
+    """ Generate a survey sheet to records today's results in. """
+
     today = dt.date.today().strftime("%Y%m%d")
     refresh_manifest()
 
@@ -245,7 +269,27 @@ def serve_survey():
     return template("survey.tpl", records=records)
 
 
-@app.route('/moth/<species>')
+@app.route('/summary')
+def get_summary():
+    """ Display an overall summary for the Moths web-site. """
+    cnx = mariadb.connect(**sql_config)
+    db = cnx.cursor()
+    
+    # Update species graph
+
+
+    # Update catch diversity graph
+
+    # Update catch volume graph
+
+
+
+
+    db.close()
+    cnx.close()
+
+    return template("summary.tpl", summary_image_file=cfg['GRAPH_PATH']+cfg['CUM_SPECIES_GRAPH'])
+
 @app.route('/species/<species>')
 def get_species(species):
     """ Generate a summary page for the specified moth species.

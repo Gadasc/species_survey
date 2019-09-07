@@ -11,10 +11,9 @@
 <body>
 
 
-<h1>Latest Moth Catches</h1>
+<h1>Moth Summary</h1>
 % include("menu_moth.tpl")
-<p> </p>
-{{!html_table}}
-
+<h2>Annual Species Count</h2>
+<img src="/graph/"{{summary_image_file}} alt="Cummulative Species Summary Graph">
 </body>
 </html>
