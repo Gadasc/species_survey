@@ -10,6 +10,7 @@ appropriately and setting u+x permissions:
 
 History
 -------
+07 Sep 2019 - Fine tuning table to only remove singletons.
 18 Aug 2019 - moving back to RPi and generating manifest file on the fly.
 15 Aug 2019 - Combining functions to update database
 13 Aug 2019 - Adding route page and working out how to add javascript
@@ -90,6 +91,21 @@ def update_moth_database(cursor, sql_date_string, dict_records):
         ins_string = ', '.join(ins_list)
         cursor.execute("INSERT INTO moth_records (Date, MothName, MothCount) VALUES {};".format(ins_string))
 
+def generate_records_file(cursor, date_dash_str):
+    """ Ensure the records file cfg['RECORD_PATH'] exists
+        This file contains the {moth(with underscords): count:str} dict in json form
+    """
+    columns = ['MothName', 'MothCount']
+    cursor.execute(f"SELECT {','.join(columns)} FROM moth_records where Date='{date_dash_str}';")
+    records_dict = {}
+    for  mn, mc in cursor:
+        print(f"{mn}: {str(mc)}")
+        records_dict[mn.replace(' ', '_')] = str(mc)
+
+    print(records_dict)
+    with open(f"{cfg['RECORDS_PATH']}day_count_{date_dash_str.replace('-','')}.json", 'w') as json_out:
+        json_out.write(json.dumps(records_dict))
+
 
 def show_latest_moths(cursor):
     """ Generate a table showing the latest records.
@@ -107,6 +123,8 @@ def show_latest_moths(cursor):
     recent_df = pd.DataFrame.from_dict(records_dict, columns=columns, orient='index')
     recent_df["MothName"] = recent_df["MothName"].apply(
                                 lambda mn: f'<a href="/species/{mn}">{mn}</a>')
+    recent_df["Date"] = recent_df["Date"].apply(
+                                lambda dd: f'<a href="/survey/{dd}">{dd}</a>')
     recent_df.set_index(["Date", "MothName"], inplace=True)
 
     return recent_df.unstack("Date").fillna("").to_html(escape=False, justify='left')
@@ -255,18 +273,32 @@ def service_static_file(filename):
 
 
 @app.route("/survey")
-def serve_survey():
+@app.route("/survey/<dash_date_str:re:\d{4}-\d{2}-\d{2}>")
+def serve_survey(dash_date_str=None):
     """ Generate a survey sheet to records today's results in. """
+    cnx = mariadb.connect(**sql_config)
+    db = cnx.cursor()
 
-    today = dt.date.today().strftime("%Y%m%d")
-    refresh_manifest()
+    if dash_date_str:
+        generate_records_file(db, dash_date_str)
+        # TODO we may want to just remove the manifest to simplify the historical servey sheet.
+        #return date
+    else:
+        dash_date_str = dt.date.today().strftime("%Y-%m-%d")
+        refresh_manifest()  # The manifest shows the moths that could be caught
 
     try:
-        with open(f"{cfg['RECORDS_PATH']}day_count_{today}.json") as json_in:
+        date_str = dash_date_str.replace('-', '')
+        with open(f"{cfg['RECORDS_PATH']}day_count_{date_str}.json") as json_in:
             records = json.load(json_in)
     except  FileNotFoundError:
         records = {}
-    return template("survey.tpl", records=records)
+
+    print("Recent moths:", records)
+    db.close()
+    cnx.close()
+
+    return template("survey.tpl", records=records, dash_date_str=dash_date_str)
 
 
 @app.route('/summary')
@@ -348,13 +380,15 @@ def show_latest():
 def survey_handler():
     """ Handler to manage the data returned from the survey sheet. """
     records_dir = cfg["RECORDS_PATH"]
-    today_string = dt.datetime.now()
-    fout_fname = records_dir + today_string.strftime("%Y%m%d_%H%M") +"_moth_records.csv"
-    fout_json = records_dir + "day_count_" + today_string.strftime("%Y%m%d") +".json"
+#    today_string = dt.datetime.now()
+    date_string = request.forms['dash_date_str']
+    #fout_fname = records_dir + today_string.strftime("%Y%m%d_%H%M") +"_moth_records.csv"
+    fout_json = records_dir + "day_count_" + date_string.replace('-','') +".json"
 
     rs = list()
     results_dict = dict()
     for moth in request.forms.keys():
+        if moth == "dash_date_str": continue
         specimens = request.forms.get(moth, default=0, index=0, type=int)  # leave result as string
         if specimens:
             rs.append(f"<p><strong>{moth}</strong>      {specimens}</p>")
@@ -362,7 +396,7 @@ def survey_handler():
 
     output = "<!DOCTYPE html><html><head><TITLE>Survey Results</TITLE></head>"
     output += "<body><H1>Moths Survey</H1>"
-    output += "Date: " + str(today_string)
+    output += "Date: " + str(date_string) + "</p>"
 
     # Get a connection to the databe
     cnx = mariadb.connect(**sql_config)
@@ -371,18 +405,18 @@ def survey_handler():
    # Store results locally  so when survey sheet is recalled it will auto populate
     with open(fout_json, 'w') as fout_js:
         fout_js.write(json.dumps(results_dict))
-    # Build table  and store resolve in a csv file. [This could duplication of json file!]
+#    # Build table  and store resolve in a csv file. [This could duplication of json file!]
     output += "<table><th>Species</th><th>Count</th>"
-    with open(fout_fname, "w") as fout:
-        for species, count in results_dict.items():
-            output += "<tr><td>{}</td><td>{}<td>".format(species.replace("_", " "), count)
-            fout.write('{}, {}\n'.format(species, count))
-
+#    with open(fout_fname, "w") as fout:
+    for species, count in results_dict.items():
+        output += "<tr><td>{}</td><td>{}<td>".format(species.replace("_", " "), count)
+#            fout.write('{}, {}\n'.format(species, count))
+ 
     output += "</table>"
     output += '<a href="/survey">Survey Sheet</a>'
 
     update_moth_database(cursor,
-                         dt.date.today().strftime('%Y-%m-%d'),
+                         date_string,
                          results_dict)
 
     # Update a table showing the historical data for last two weeks.

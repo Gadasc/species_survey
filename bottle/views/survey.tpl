@@ -11,8 +11,10 @@
 
 
 <h1>Macro Moths</h1>
+<h2>{{dash_date_str}}</h2>
 <p id="todays_date">
 <form id="mothsForm", autocomplete="off" action="/handle_survey" method="post">
+<input type="text" name="dash_date_str" value="{{dash_date_str}}">
 <table id="demo">
 <tr id="headers"><th>Species</th><th>Rcnt</th><th>Count</th></tr>
 <tr id="moth_search">
