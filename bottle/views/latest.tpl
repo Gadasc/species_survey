@@ -9,10 +9,8 @@
 </head>
 
 <body>
-
-
-<h1>Latest Moth Catches</h1>
 % include("menu_moth.tpl")
+<h1>Latest Moth Catches</h1>
 <p> </p>
 {{!html_table}}
 

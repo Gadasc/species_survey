@@ -9,11 +9,9 @@
 </head>
 
 <body>
-
-
+% include("menu_moth.tpl")
 <h1>Home - Moths Survey</h1>
 <div>
-% include("menu_moth.tpl")
 </div>
 <hr>
 <p id="todays_date">

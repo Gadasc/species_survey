@@ -7,22 +7,22 @@ h1 {
 }
 
 .clearfix:after {
-     	clear:both;
+    clear:both;
 	overflow: auto;
-     	zoom: 1;
+    zoom: 1;
 	content: " "; 
-     	visibility: hidden;
-     	display: block;
-     	height: 0;
+    visibility: hidden;
+    display: block;
+    height: 0;
 }
 
 .top_menu UL{
 	position:relative;
 	float:left;
-	width: 100%;
 	left:0;
 	margin:0;
 	padding:0;
+    background: #7092BE;
 }
 
 .top_menu LI{
@@ -32,9 +32,9 @@ h1 {
 	color:#FFFFFF;
 	float:left;
 	font-weight: bold;	
-	line-height:24pt;
 	text-align: center;
 	position: relative;
+    
 }
 
 

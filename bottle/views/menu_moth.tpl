@@ -12,3 +12,4 @@
 <li><a href="/new">New item</a></li>
 </ul>
 </nav>
+<div class="clearfix"></div>

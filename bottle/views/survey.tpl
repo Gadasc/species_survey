@@ -5,16 +5,15 @@
 <meta http-equiv="cache-control" content="no-cache" />
 <title>Merrington House Moth Survey</title>
 <link rel="stylesheet" type="text/css" href="/static/autocomplete.css">
+<link rel="stylesheet" type="text/css" href="/static/mothmenu.css">
 </head>
 
 <body>
-
-
+% include("menu_moth.tpl")
 <h1>Macro Moths</h1>
-<h2>{{dash_date_str}}</h2>
 <p id="todays_date">
 <form id="mothsForm", autocomplete="off" action="/handle_survey" method="post">
-<input type="text" name="dash_date_str" value="{{dash_date_str}}">
+Date: <input type="text" name="dash_date_str"  value="{{dash_date_str}}" readonly></p>
 <table id="demo">
 <tr id="headers"><th>Species</th><th>Rcnt</th><th>Count</th></tr>
 <tr id="moth_search">

@@ -10,6 +10,7 @@ appropriately and setting u+x permissions:
 
 History
 -------
+08 Sep 2019 - Now allows historic data to be modified by adding date YYYY-MM-DD to /survey/
 07 Sep 2019 - Fine tuning table to only remove singletons.
 18 Aug 2019 - moving back to RPi and generating manifest file on the fly.
 15 Aug 2019 - Combining functions to update database
@@ -30,6 +31,7 @@ import datetime as dt
 import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.dates import MonthLocator, DateFormatter
+import numpy as np
 #from werkzeug.middleware.profiler import ProfilerMiddleware
 import os
 import json
@@ -145,6 +147,9 @@ def get_moth_catches(moth_name: str):
 
     data_list = [list(c) for c in cursor]
     survey_df = pd.DataFrame(data_list, columns=columns)
+    cursor.close()
+    cnx.close()
+
     return survey_df
 
 def get_moths_list():
@@ -174,7 +179,7 @@ def graph_date_overlay():
     except FileNotFoundError:
         pass
 
-    fig = plt.figure( **plot_dict)
+    fig = plt.figure(**plot_dict)
     ax = fig.add_subplot(111)
     ax.set_xlim(today.replace(month=1, day=1), today.replace(month=12, day=31))
     ax.xaxis.set_major_locator(MonthLocator())
@@ -188,14 +193,15 @@ def graph_date_overlay():
 
 def get_db_update_time():
     """ Return a datetime.datetime object with the update time of the database
+        This only works on some db engines - recent versions of mariadb but not myql
     """
     cnx = mariadb.connect(**sql_config)
     cursor = cnx.cursor()
     cursor.execute("SELECT update_time FROM information_schema.tables "
-                   f"WHERE table_schema = 'cold_ash_moths' "
+                   f"WHERE TABLE_SCHEMA = 'cold_ash_moths' "
                    f"AND table_name = 'moth_records';")
-    print(cursor.column_names)
-    update_time = cursor.fetchone()[0] 
+    update_time, = cursor.fetchone() 
+    print(update_time)
     cursor.close()
     cnx.close()
     return update_time
@@ -217,6 +223,17 @@ def graph_mothname_v2(mothname):
     except FileNotFoundError:
         print(f"Unable to find {GRAPH_PATH}{mothname}.png so will create it.")
 
+    # If a moth was caught today the graph will be updated.
+    # So find out if the graph is newer than the last database update - if so we don't recreate
+    try:
+        file_update_time = dt.datetime.fromtimestamp(os.path.getmtime(f"{GRAPH_PATH}{mothname}.png"))
+        print(f"File: {mothname}.png was updated: {file_update_time}")
+        db_update_time = get_db_update_time()
+        print(f"Database:            was updated: {db_update_time}")
+        if file_update_time > db_update_time: return
+    except (FileNotFoundError, TypeError):
+        print("File still not found")
+
     today = dt.date.today()
     date_year_index = pd.DatetimeIndex(
                             pd.date_range(start=today.replace(month=1, day=1),
@@ -234,8 +251,8 @@ def graph_mothname_v2(mothname):
     x = all_catches_df.values[:,0]
     y_all = all_catches_df.values[:,1]
     y_this = this_year_df.values[:,1]
-
-    fig = plt.figure( **plot_dict)
+    print(str(plot_dict))
+    fig = plt.figure(**plot_dict)
     ax = fig.add_subplot(111)
     ax.set_title(mothname)
     ax.plot(x, y_all, label="Average")
@@ -304,12 +321,40 @@ def serve_survey(dash_date_str=None):
 @app.route('/summary')
 def get_summary():
     """ Display an overall summary for the Moths web-site. """
+    today = dt.date.today()
+
     cnx = mariadb.connect(**sql_config)
     db = cnx.cursor()
-    
+
     # Update species graph
+    db.execute("SELECT year(Date) Year, Date, MothName FROM moth_records;")
+    cum_species = pd.DataFrame([list(c) for c in db], columns = list(db.column_names))
+    cum_species['Catch'] = 1
+    cum_species['Date'] = cum_species['Date'].map(lambda dd: dd.replace(year=today.year))
+    cum_species.set_index(['Year', 'Date', 'MothName'], inplace=True)
+    cum_results = cum_species.unstack('Date')\
+                             .fillna(method='ffill', axis=1)\
+                             .groupby(by='Year')\
+                             .count()\
+                             .Catch\
+                             .astype(float)  # Needs to be float for mask to work
 
+    # Finally mask out future dates to avoid the graph plotting a horizontal line to eoy
+    cum_results.loc[today.year]\
+               .mask(cum_results.columns > str(today), other=np.NaN, inplace=True)
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax = cum_results.transpose().plot(marker='',
+                                      linestyle='-',
+                                      label='Species Total',
+                                      **plot_dict)
+    ax.xaxis.set_major_locator(MonthLocator())
+    ax.xaxis.set_major_formatter(DateFormatter("%b"))
+    ax.set_xlim([today.replace(month=1, day=1), today.replace(month=12, day=30)])
 
+    #cum_results.transpose().plot()
+    plt.savefig(f"{cfg['GRAPH_PATH']}{cfg['CUM_SPECIES_GRAPH']}")
+    plt.close()
     # Update catch diversity graph
 
     # Update catch volume graph
