@@ -10,6 +10,7 @@ appropriately and setting u+x permissions:
 
 History
 -------
+14 Sep 2019 - add summary page
 08 Sep 2019 - Now allows historic data to be modified by adding date YYYY-MM-DD to /survey/
 07 Sep 2019 - Fine tuning table to only remove singletons.
 18 Aug 2019 - moving back to RPi and generating manifest file on the fly.
@@ -303,6 +304,7 @@ def serve_survey(dash_date_str=None):
     else:
         dash_date_str = dt.date.today().strftime("%Y-%m-%d")
         refresh_manifest()  # The manifest shows the moths that could be caught
+
 
     try:
         date_str = dash_date_str.replace('-', '')
