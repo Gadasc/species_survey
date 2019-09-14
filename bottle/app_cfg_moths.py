@@ -5,7 +5,7 @@ File containing a directory  of configuration information for the application
 
 app_config = dict()
 app_config["HOST"] = "moths.connect"
-app_config["PORT"] = 8082 
+app_config["PORT"] = 8082
 app_config["GRAPH_PATH"] = "./graphs/"
 app_config["RECORDS_PATH"] = "./records/"
 app_config["STATIC_PATH"] = "./static/"
