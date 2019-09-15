@@ -10,6 +10,7 @@ appropriately and setting u+x permissions:
 
 History
 -------
+15 Sep 2019 - Adding code to avoid updating summary graph unless needed.
 14 Sep 2019 - add summary page
 08 Sep 2019 - Now allows data to be modified by adding date YYYY-MM-DD to /survey/
 07 Sep 2019 - Fine tuning table to only remove singletons.
@@ -225,21 +226,37 @@ def graph_date_overlay():
     plt.close()
 
 
-def get_db_update_time():
+def _get_file_update_time(fname: str) -> dt.datetime:
+    """ helper function to the updated time of a file """
+    return dt.datetime.fromtimestamp(os.path.getmtime(fname))
+
+
+def get_db_update_time(use_db: bool = False) -> dt.datetime:
     """ Return a datetime.datetime object with the update time of the database
         This only works on some db engines - recent versions of mariadb but not myql
     """
-    cnx = mariadb.connect(**sql_config)
-    cursor = cnx.cursor()
-    cursor.execute(
-        "SELECT update_time FROM information_schema.tables "
-        f"WHERE TABLE_SCHEMA = 'cold_ash_moths' "
-        f"AND table_name = 'moth_records';"
-    )
-    update_time, = cursor.fetchone()
-    print(update_time)
-    cursor.close()
-    cnx.close()
+    update_time = None
+
+    if use_db:
+        print("Checking db for last update", end="")
+        cnx = mariadb.connect(**sql_config)
+        cursor = cnx.cursor()
+        cursor.execute(
+            "SELECT update_time FROM information_schema.tables "
+            f"WHERE TABLE_SCHEMA = 'cold_ash_moths' "
+            f"AND table_name = 'moth_records';"
+        )
+        update_time, = cursor.fetchone()
+        print(update_time)
+        cursor.close()
+        cnx.close()
+
+    if not update_time or not use_db:
+        print("Using last dir update time, ", end="")
+        # Find most recent datetime change to the directory and use this.
+        update_time = _get_file_update_time(".")
+        print(update_time)
+
     return update_time
 
 
@@ -374,47 +391,55 @@ def get_summary():
     """ Display an overall summary for the Moths web-site. """
     today = dt.date.today()
 
-    cnx = mariadb.connect(**sql_config)
-    db = cnx.cursor()
-
-    # Update species graph
-    db.execute("SELECT year(Date) Year, Date, MothName FROM moth_records;")
-    cum_species = pd.DataFrame([list(c) for c in db], columns=list(db.column_names))
-    cum_species["Catch"] = 1
-    cum_species["Date"] = cum_species["Date"].map(
-        lambda dd: dd.replace(year=today.year)
+    # Determine if summary graph is out of date
+    # MariaDB will give the last update time, while MySQL doesn't.
+    # So we will use the locally stored records and compare to the timestamp of the file
+    db_update_time = get_db_update_time()
+    summary_graph_time = _get_file_update_time(
+        f"{cfg['GRAPH_PATH']}{cfg['CUM_SPECIES_GRAPH']}.png"
     )
-    cum_species.set_index(["Year", "Date", "MothName"], inplace=True)
-    cum_results = (
-        cum_species.unstack("Date")
-        .fillna(method="ffill", axis=1)
-        .groupby(by="Year")
-        .count()
-        .Catch.astype(float)
-    )  # Needs to be float for mask to work
+    if db_update_time > summary_graph_time:
 
-    # Finally mask out future dates to avoid the graph plotting a horizontal line to eoy
-    cum_results.loc[today.year].mask(
-        cum_results.columns > str(today), other=np.NaN, inplace=True
-    )
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    ax = cum_results.transpose().plot(
-        marker="", linestyle="-", label="Species Total", **plot_dict
-    )
-    ax.xaxis.set_major_locator(MonthLocator())
-    ax.xaxis.set_major_formatter(DateFormatter("%b"))
-    ax.set_xlim([today.replace(month=1, day=1), today.replace(month=12, day=30)])
+        cnx = mariadb.connect(**sql_config)
+        db = cnx.cursor()
 
-    # cum_results.transpose().plot()
-    plt.savefig(f"{cfg['GRAPH_PATH']}{cfg['CUM_SPECIES_GRAPH']}")
-    plt.close()
+        # Update species graph
+        db.execute("SELECT year(Date) Year, Date, MothName FROM moth_records;")
+        cum_species = pd.DataFrame([list(c) for c in db], columns=list(db.column_names))
+        cum_species["Catch"] = 1
+        cum_species["Date"] = cum_species["Date"].map(
+            lambda dd: dd.replace(year=today.year)
+        )
+        cum_species.set_index(["Year", "Date", "MothName"], inplace=True)
+        cum_results = (
+            cum_species.unstack("Date")
+            .fillna(method="ffill", axis=1)
+            .groupby(by="Year")
+            .count()
+            .Catch.astype(float)
+        )  # Needs to be float for mask to work
+
+        # Mask future dates to avoid plotting a horizontal line to eoy
+        cum_results.loc[today.year].mask(
+            cum_results.columns > str(today), other=np.NaN, inplace=True
+        )
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        ax = cum_results.transpose().plot(
+            marker="", linestyle="-", label="Species Total", **plot_dict
+        )
+        ax.xaxis.set_major_locator(MonthLocator())
+        ax.xaxis.set_major_formatter(DateFormatter("%b"))
+        ax.set_xlim([today.replace(month=1, day=1), today.replace(month=12, day=30)])
+
+        # cum_results.transpose().plot()
+        plt.savefig(f"{cfg['GRAPH_PATH']}{cfg['CUM_SPECIES_GRAPH']}")
+        plt.close()
+        db.close()
+        cnx.close()
     # Update catch diversity graph
 
     # Update catch volume graph
-
-    db.close()
-    cnx.close()
 
     return template(
         "summary.tpl", summary_image_file=cfg["GRAPH_PATH"] + cfg["CUM_SPECIES_GRAPH"]
@@ -488,10 +513,11 @@ def show_latest():
 @app.post("/handle_survey")
 def survey_handler():
     """ Handler to manage the data returned from the survey sheet. """
-    records_dir = cfg["RECORDS_PATH"]
     #    today_string = dt.datetime.now()
     date_string = request.forms["dash_date_str"]
-    fout_json = records_dir + "day_count_" + date_string.replace("-", "") + ".json"
+    fout_json = (
+        cfg["RECORDS_PATH"] + "day_count_" + date_string.replace("-", "") + ".json"
+    )
 
     rs = list()
     results_dict = dict()
