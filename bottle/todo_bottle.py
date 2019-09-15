@@ -13,8 +13,6 @@ from bottle import (
     TEMPLATE_PATH,
 )
 
-# only needed when you run Bottle on mod_wsgi
-from bottle import default_app
 
 DATABASE_FILE = "todo.db"
 

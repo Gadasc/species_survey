@@ -1,0 +1,6 @@
+repos:
+-   repo: /home/gareth/development/git_survey
+    rev: master
+    hooks:
+    - id: black
+      language_version: python3.7

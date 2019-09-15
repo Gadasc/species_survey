@@ -3,7 +3,7 @@
 """
 moth_bottle.py
 
-Install by adding the following to crontab - replacing PATH 
+Install by adding the following to crontab - replacing PATH
 appropriately and setting u+x permissions:
 
 @reboot PATH/moth_bottle.py &
@@ -11,7 +11,7 @@ appropriately and setting u+x permissions:
 History
 -------
 14 Sep 2019 - add summary page
-08 Sep 2019 - Now allows historic data to be modified by adding date YYYY-MM-DD to /survey/
+08 Sep 2019 - Now allows data to be modified by adding date YYYY-MM-DD to /survey/
 07 Sep 2019 - Fine tuning table to only remove singletons.
 18 Aug 2019 - moving back to RPi and generating manifest file on the fly.
 15 Aug 2019 - Combining functions to update database
@@ -24,12 +24,11 @@ History
 
 from app_config import app_config as cfg
 import bottle
-from bottle import route, run, Bottle, template, static_file, request, TEMPLATE_PATH
+from bottle import Bottle, template, static_file, request, TEMPLATE_PATH
 import pandas as pd
 import mysql.connector as mariadb
 from sql_config import sql_config
 import datetime as dt
-import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.dates import MonthLocator, DateFormatter
 import numpy as np
@@ -94,7 +93,7 @@ def update_moth_database(cursor, sql_date_string, dict_records):
     cursor.execute("DELETE FROM moth_records WHERE Date = %s;", (sql_date_string,))
 
     if not dict_records:
-        # If no moths recorded, then add a null entry to identify we did trap on this date.
+        # If no moths recorded, add a null entry to identify we did trap on this date.
         cursor.execute(
             "INSERT INTO moth_records (Date) VALUES (%s);", (sql_date_string,)
         )
@@ -135,12 +134,12 @@ def generate_records_file(cursor, date_dash_str):
 
 def show_latest_moths(cursor):
     """ Generate a table showing the latest records.
-        Because we are using mysql.connector instead sqlalchemy which ORM we 
+        Because we are using mysql.connector instead sqlalchemy which ORM we
         need to query the database with an SQL string and build the recent
         sightings table."""
 
     columns = ["Date", "MothName", "MothCount"]
-    mothname_col = columns.index("MothName")
+    # mothname_col = columns.index("MothName")
 
     cursor.execute(
         f"SELECT {', '.join(columns)} FROM moth_records WHERE "
@@ -251,7 +250,8 @@ def graph_mothname_v2(mothname):
     print(f"Latest date: {catches_df.Date.max()}")
     try:
         print(
-            f'{mothname}.png modified: {dt.date.fromtimestamp(os.path.getmtime(f"{GRAPH_PATH}{mothname}.png"))}'
+            f"{mothname}.png modified: "
+            f'{dt.date.fromtimestamp(os.path.getmtime(f"{GRAPH_PATH}{mothname}.png"))}'
         )
     except FileNotFoundError:
         print(f"{mothname}.png missing!")
@@ -266,7 +266,8 @@ def graph_mothname_v2(mothname):
         print(f"Unable to find {GRAPH_PATH}{mothname}.png so will create it.")
 
     # If a moth was caught today the graph will be updated.
-    # So find out if the graph is newer than the last database update - if so we don't recreate
+    # So find out if the graph is newer than the last database update,
+    # if so we don't recreate
     try:
         file_update_time = dt.datetime.fromtimestamp(
             os.path.getmtime(f"{GRAPH_PATH}{mothname}.png")
@@ -340,7 +341,7 @@ def service_static_file(filename):
 
 
 @app.route("/survey")
-@app.route("/survey/<dash_date_str:re:\d{4}-\d{2}-\d{2}>")
+@app.route("/survey/<dash_date_str:re:\\d{4}-\\d{2}-\\d{2}>")
 def serve_survey(dash_date_str=None):
     """ Generate a survey sheet to records today's results in. """
     cnx = mariadb.connect(**sql_config)
@@ -348,8 +349,8 @@ def serve_survey(dash_date_str=None):
 
     if dash_date_str:
         generate_records_file(db, dash_date_str)
-        # TODO we may want to just remove the manifest to simplify the historical servey sheet.
-        # return date
+        # TODO we may want to just remove the manifest to simplify the historical
+        # survey sheet.
     else:
         dash_date_str = dt.date.today().strftime("%Y-%m-%d")
         refresh_manifest()  # The manifest shows the moths that could be caught
@@ -449,15 +450,16 @@ def get_species(species):
         graph_date_overlay()
         graph_mothname_v2(species)
 
+        css_graph = "position: relative; top: 0px; left: 0px;"
         return (
             f"<h1>{species}</h1>\n"
-            + f'<A href="/latest">Recent Catches</A></p>\n'
-            + '<div style="position: relative;">\n'
-            + f'<img style="position: relative; top: 0px; left: 0px;" src="/graphs/{species}" />\n'
-            + f'<img style="position: absolute; top: 0px; left: 0px;" src="/graphs/date_overlay" />\n'
-            + "</div>\n"
-            + all_survey_df[["Date", "MothName", "MothCount"]].to_html(index=False)
-            + "</p>"
+            f'<A href="/latest">Recent Catches</A></p>\n'
+            f'<div style="position: relative;">\n'
+            f'<img style="{css_graph}" src="/graphs/{species}" />\n'
+            f'<img style="{css_graph}" src="/graphs/date_overlay" />\n'
+            f"</div>\n"
+            f'{all_survey_df[["Date", "MothName", "MothCount"]].to_html(index=False)}'
+            f"</p>"
         )
 
     else:
@@ -489,7 +491,6 @@ def survey_handler():
     records_dir = cfg["RECORDS_PATH"]
     #    today_string = dt.datetime.now()
     date_string = request.forms["dash_date_str"]
-    # fout_fname = records_dir + today_string.strftime("%Y%m%d_%H%M") +"_moth_records.csv"
     fout_json = records_dir + "day_count_" + date_string.replace("-", "") + ".json"
 
     rs = list()
@@ -515,12 +516,10 @@ def survey_handler():
     # Store results locally  so when survey sheet is recalled it will auto populate
     with open(fout_json, "w") as fout_js:
         fout_js.write(json.dumps(results_dict))
-    #    # Build table  and store resolve in a csv file. [This could duplication of json file!]
+    # Build table and store resolve in a csv file.
     output += "<table><th>Species</th><th>Count</th>"
-    #    with open(fout_fname, "w") as fout:
     for species, count in results_dict.items():
         output += "<tr><td>{}</td><td>{}<td>".format(species.replace("_", " "), count)
-    #            fout.write('{}, {}\n'.format(species, count))
 
     output += "</table>"
     output += '<a href="/survey">Survey Sheet</a>'
@@ -538,7 +537,7 @@ def survey_handler():
 
 @app.route("/debug")
 def debug_info():
-    """ Route showing some debug. 
+    """ Route showing some debug.
     """
     return [str(route.__dict__) + "</p>" for route in app.routes]
 
