@@ -254,7 +254,7 @@ def get_db_update_time(use_db: bool = False) -> dt.datetime:
     if not update_time or not use_db:
         print("Using last dir update time, ", end="")
         # Find most recent datetime change to the directory and use this.
-        update_time = _get_file_update_time(".")
+        update_time = _get_file_update_time(cfg["RECORDS_PATH"])
         print(update_time)
 
     return update_time
@@ -399,7 +399,8 @@ def get_summary():
         f"{cfg['GRAPH_PATH']}{cfg['CUM_SPECIES_GRAPH']}.png"
     )
     if db_update_time > summary_graph_time:
-
+        print(f"DB updated {db_update_time} since last summary graph update {summary_graph_time}. "
+              f"Updating summary graph")
         cnx = mariadb.connect(**sql_config)
         db = cnx.cursor()
 
