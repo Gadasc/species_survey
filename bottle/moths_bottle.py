@@ -10,6 +10,7 @@ appropriately and setting u+x permissions:
 
 History
 -------
+16 Sep 2019 - Adding logging
 15 Sep 2019 - Adding code to avoid updating summary graph unless needed.
 14 Sep 2019 - add summary page
 08 Sep 2019 - Now allows data to be modified by adding date YYYY-MM-DD to /survey/
@@ -25,7 +26,7 @@ History
 
 from app_config import app_config as cfg
 import bottle
-from bottle import Bottle, template, static_file, request, TEMPLATE_PATH
+from bottle import Bottle, template, static_file, TEMPLATE_PATH, request, response
 import pandas as pd
 import mysql.connector as mariadb
 from sql_config import sql_config
@@ -33,6 +34,9 @@ import datetime as dt
 import matplotlib.pyplot as plt
 from matplotlib.dates import MonthLocator, DateFormatter
 import numpy as np
+import logging
+import logging.handlers
+from functools import wraps
 
 # from werkzeug.middleware.profiler import ProfilerMiddleware
 import os
@@ -49,6 +53,52 @@ GRAPH_PATH = cfg["GRAPH_PATH"]
 OVERLAY_FILE = cfg["OVERLAY_FILE"]
 STATIC_PATH = cfg["STATIC_PATH"]
 
+# Collect the logging set up into a common file.
+moth_logger = logging.getLogger("moth_logger")
+moth_logger.setLevel(logging.DEBUG)
+
+handler = logging.handlers.RotatingFileHandler(
+    cfg["LOG_PATH"] + cfg["LOG_FILE"], maxBytes=1024 * 1024, backupCount=7
+)
+moth_logger.addHandler(handler)
+
+
+# set up the requests logger
+requests_logger = logging.getLogger("requests_logger")
+requests_logger.setLevel(logging.INFO)
+file_handler = logging.handlers.RotatingFileHandler(
+    cfg["LOG_PATH"] + cfg["REQUESTS_LOG_FILE"], maxBytes=1024 * 1024, backupCount=2
+)
+formatter = logging.Formatter("%(msg)s")
+file_handler.setFormatter(formatter)
+requests_logger.addHandler(file_handler)
+
+
+def log_to_logger(fn):
+    """
+    Wrap a Bottle request so that a log line is emitted after it's handled.
+    (This decorator can be extended to take the desired logger as a param.)
+    """
+
+    @wraps(fn)
+    def _log_to_logger(*args, **kwargs):
+        request_time = dt.datetime.now()
+        actual_response = fn(*args, **kwargs)
+        # modify this to log exactly what you need:
+        requests_logger.info(
+            "%s %s %s %s %s"
+            % (
+                request.remote_addr,
+                request_time,
+                request.method,
+                request.url,
+                response.status,
+            )
+        )
+        return actual_response
+
+    return _log_to_logger
+
 
 def refresh_manifest():
     """ Check the javascript manifest.js file is up to date """
@@ -60,7 +110,7 @@ def refresh_manifest():
             )
             == today
         ):
-            print("Today's manifest exists - returning.")
+            moth_logger.debug("Today's manifest exists - returning.")
             return
     except FileNotFoundError:
         pass
@@ -123,10 +173,10 @@ def generate_records_file(cursor, date_dash_str):
     )
     records_dict = {}
     for mn, mc in cursor:
-        print(f"{mn}: {str(mc)}")
+        moth_logger.debug(f"{mn}: {str(mc)}")
         records_dict[mn.replace(" ", "_")] = str(mc)
 
-    print(records_dict)
+    moth_logger.debug(records_dict)
     with open(
         f"{cfg['RECORDS_PATH']}day_count_{date_dash_str.replace('-','')}.json", "w"
     ) as json_out:
@@ -209,7 +259,7 @@ def graph_date_overlay():
             )
             == today
         ):
-            print("Today's overlay exists - returning.")
+            moth_logger.debug("Today's overlay exists - returning.")
             return
     except FileNotFoundError:
         pass
@@ -238,7 +288,7 @@ def get_db_update_time(use_db: bool = False) -> dt.datetime:
     update_time = None
 
     if use_db:
-        print("Checking db for last update", end="")
+        moth_logger.debug("Checking db for last update")
         cnx = mariadb.connect(**sql_config)
         cursor = cnx.cursor()
         cursor.execute(
@@ -247,15 +297,15 @@ def get_db_update_time(use_db: bool = False) -> dt.datetime:
             f"AND table_name = 'moth_records';"
         )
         update_time, = cursor.fetchone()
-        print(update_time)
+        moth_logger.debug(update_time)
         cursor.close()
         cnx.close()
 
     if not update_time or not use_db:
-        print("Using last dir update time, ", end="")
+        moth_logger.debug("Using last dir update time, ")
         # Find most recent datetime change to the directory and use this.
         update_time = _get_file_update_time(".")
-        print(update_time)
+        moth_logger.debug(update_time)
 
     return update_time
 
@@ -264,23 +314,25 @@ def graph_mothname_v2(mothname):
     catches_df = get_moth_catches(mothname)
 
     # Test results
-    print(f"Latest date: {catches_df.Date.max()}")
+    moth_logger.debug(f"Latest date: {catches_df.Date.max()}")
     try:
-        print(
+        moth_logger.debug(
             f"{mothname}.png modified: "
             f'{dt.date.fromtimestamp(os.path.getmtime(f"{GRAPH_PATH}{mothname}.png"))}'
         )
     except FileNotFoundError:
-        print(f"{mothname}.png missing!")
+        moth_logger.debug(f"{mothname}.png missing!")
 
     try:
         if catches_df.Date.max() < dt.date.fromtimestamp(
             os.path.getmtime(f"{GRAPH_PATH}{mothname}.png")
         ):
-            print(f"File is new enough. Not updating {mothname}")
+            moth_logger.debug(f"File is new enough. Not updating {mothname}")
             return
     except FileNotFoundError:
-        print(f"Unable to find {GRAPH_PATH}{mothname}.png so will create it.")
+        moth_logger.debug(
+            f"Unable to find {GRAPH_PATH}{mothname}.png so will create it."
+        )
 
     # If a moth was caught today the graph will be updated.
     # So find out if the graph is newer than the last database update,
@@ -289,13 +341,13 @@ def graph_mothname_v2(mothname):
         file_update_time = dt.datetime.fromtimestamp(
             os.path.getmtime(f"{GRAPH_PATH}{mothname}.png")
         )
-        print(f"File: {mothname}.png was updated: {file_update_time}")
+        moth_logger.debug(f"File: {mothname}.png was updated: {file_update_time}")
         db_update_time = get_db_update_time()
-        print(f"Database:            was updated: {db_update_time}")
+        moth_logger.debug(f"Database:            was updated: {db_update_time}")
         if file_update_time > db_update_time:
             return
     except (FileNotFoundError, TypeError):
-        print("File still not found")
+        moth_logger.debug("File still not found")
 
     today = dt.date.today()
     date_year_index = pd.DatetimeIndex(
@@ -318,7 +370,7 @@ def graph_mothname_v2(mothname):
     x = all_catches_df.values[:, 0]
     y_all = all_catches_df.values[:, 1]
     y_this = this_year_df.values[:, 1]
-    print(str(plot_dict))
+    moth_logger.debug(str(plot_dict))
     fig = plt.figure(**plot_dict)
     ax = fig.add_subplot(111)
     ax.set_title(mothname)
@@ -335,6 +387,7 @@ def graph_mothname_v2(mothname):
 
 
 app = Bottle()
+app.install(log_to_logger)  # Logs html requests to a file
 
 
 @app.route("/graphs/<species>")
@@ -379,7 +432,7 @@ def serve_survey(dash_date_str=None):
     except FileNotFoundError:
         records = {}
 
-    print("Recent moths:", records)
+    moth_logger.debug(f"Recent moths:{str(records)}")
     db.close()
     cnx.close()
 
@@ -574,10 +627,10 @@ def survey_help():
     output = str()
     output += "<h1>Survey Help Page</h1>"
     output += "<ul>"
-    for route in app.routes:
-        label = html.escape(route.rule)
+    for rte in app.routes:
+        label = html.escape(rte.rule)
         output += f"<li><a href={label}>{label}</a></li>"
-        docstring = route.callback.__doc__
+        docstring = rte.callback.__doc__
         escstring = (
             "None"
             if not docstring
@@ -585,7 +638,7 @@ def survey_help():
         )
         output += f"<ul><li><quote>{escstring}</quote></li></ul>"
 
-        print(route)
+        moth_logger.debug(rte)
     output += "</ul>"
     return output
 
