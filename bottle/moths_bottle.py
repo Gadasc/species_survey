@@ -10,6 +10,7 @@ appropriately and setting u+x permissions:
 
 History
 -------
+17 Sep 2019 - Moving species to a view
 16 Sep 2019 - Adding logging
 15 Sep 2019 - Adding code to avoid updating summary graph unless needed.
 14 Sep 2019 - add summary page
@@ -452,8 +453,11 @@ def get_summary():
         f"{cfg['GRAPH_PATH']}{cfg['CUM_SPECIES_GRAPH']}.png"
     )
     if db_update_time > summary_graph_time:
-        print(f"DB updated {db_update_time} since last summary graph update {summary_graph_time}. "
-              f"Updating summary graph")
+        moth_logger.debug(
+            f"DB updated {db_update_time} since last summary graph update "
+            f"{summary_graph_time}. "
+            f"Updating summary graph"
+        )
         cnx = mariadb.connect(**sql_config)
         db = cnx.cursor()
 
@@ -529,17 +533,10 @@ def get_species(species):
         graph_date_overlay()
         graph_mothname_v2(species)
 
-        css_graph = "position: relative; top: 0px; left: 0px;"
-        return (
-            f"<h1>{species}</h1>\n"
-            f'<A href="/latest">Recent Catches</A></p>\n'
-            f'<div style="position: relative;">\n'
-            f'<img style="{css_graph}" src="/graphs/{species}" />\n'
-            f'<img style="{css_graph}" src="/graphs/date_overlay" />\n'
-            f"</div>\n"
-            f'{all_survey_df[["Date", "MothName", "MothCount"]].to_html(index=False)}'
-            f"</p>"
+        table_text = all_survey_df[["Date", "MothName", "MothCount"]].to_html(
+            escape=False, index=False
         )
+        return template("species.tpl", species=species, catches=table_text)
 
     else:
         # There are multiple species - so provide the choice
