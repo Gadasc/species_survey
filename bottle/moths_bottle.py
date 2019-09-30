@@ -10,6 +10,7 @@ appropriately and setting u+x permissions:
 
 History
 -------
+28 Sep 2019 - Adding Species by month graph
 17 Sep 2019 - Moving species to a view
 16 Sep 2019 - Adding logging
 15 Sep 2019 - Adding code to avoid updating summary graph unless needed.
@@ -311,6 +312,94 @@ def get_db_update_time(use_db: bool = False) -> dt.datetime:
     return update_time
 
 
+def generate_monthly_species(cursor):
+    """ Called from
+        /summary route
+        get_summary() """
+
+    moth_logger.debug(f"Creating by monthly chart")
+    sql_species_by_month_year = """
+        SELECT tw.Year, tw.Month, COUNT(tw.MothName) Species
+        FROM (
+            SELECT year(Date) Year, month(Date) Month, MothName
+                FROM moth_records
+            GROUP BY Year, Month, MothName
+        ) tw
+        GROUP BY Year, Month;"""
+
+    cursor.execute(sql_species_by_month_year)
+    data_list = [list(c) for c in cursor]
+    species_df = (
+        (
+            pd.DataFrame(data_list, columns=list(cursor.column_names))
+            .set_index(["Year", "Month"])
+            .astype(np.int)
+            .unstack("Year")
+        )
+        .fillna(0)
+        .reindex(range(1, 13))
+    )
+    x_labels = [dt.date(2019, mn, 1).strftime("%b") for mn in range(1, 13)]
+
+    # Create chart
+    this_year = dt.date.today().year
+    fig = plt.figure(**plot_dict)
+    ax = fig.add_subplot(111)
+
+    ax.bar(
+        x_labels, species_df.sum(axis="columns").values, color="#909090", label="All"
+    )
+    ax.bar(
+        x_labels, species_df.Species[this_year], width=0.5, color="b", label=this_year
+    )
+    ax.legend()
+
+    plt.savefig(f"{cfg['GRAPH_PATH']}{cfg['BY_MONTH_GRAPH']}")
+    plt.close()
+
+    moth_logger.debug(f"Generated species by month graph")
+
+
+def generate_cummulative_species_graph(cursor):
+    """ Called from get_summary """
+    today = dt.date.today()
+
+    # Update species graph
+    cursor.execute("SELECT year(Date) Year, Date, MothName FROM moth_records;")
+    cum_species = pd.DataFrame(
+        [list(c) for c in cursor], columns=list(cursor.column_names)
+    )
+    cum_species["Catch"] = 1
+    cum_species["Date"] = cum_species["Date"].map(
+        lambda dd: dd.replace(year=today.year)
+    )
+    cum_species.set_index(["Year", "Date", "MothName"], inplace=True)
+    cum_results = (
+        cum_species.unstack("Date")
+        .fillna(method="ffill", axis=1)
+        .groupby(by="Year")
+        .count()
+        .Catch.astype(float)
+    )  # Needs to be float for mask to work
+
+    # Mask future dates to avoid plotting a horizontal line to eoy
+    cum_results.loc[today.year].mask(
+        cum_results.columns > str(today), other=np.NaN, inplace=True
+    )
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax = cum_results.transpose().plot(
+        marker="", linestyle="-", label="Species Total", **plot_dict
+    )
+    ax.xaxis.set_major_locator(MonthLocator())
+    ax.xaxis.set_major_formatter(DateFormatter("%b"))
+    ax.set_xlim([today.replace(month=1, day=1), today.replace(month=12, day=30)])
+
+    # cum_results.transpose().plot()
+    plt.savefig(f"{cfg['GRAPH_PATH']}{cfg['CUM_SPECIES_GRAPH']}")
+    plt.close()
+
+
 def graph_mothname_v2(mothname):
     catches_df = get_moth_catches(mothname)
 
@@ -443,64 +532,42 @@ def serve_survey(dash_date_str=None):
 @app.route("/summary")
 def get_summary():
     """ Display an overall summary for the Moths web-site. """
-    today = dt.date.today()
+    create_graphs = False
 
     # Determine if summary graph is out of date
     # MariaDB will give the last update time, while MySQL doesn't.
     # So we will use the locally stored records and compare to the timestamp of the file
-    db_update_time = get_db_update_time()
-    summary_graph_time = _get_file_update_time(
-        f"{cfg['GRAPH_PATH']}{cfg['CUM_SPECIES_GRAPH']}.png"
-    )
-    if db_update_time > summary_graph_time:
+    try:
+        db_update_time = get_db_update_time()
+        summary_graph_time = _get_file_update_time(
+            f"{cfg['GRAPH_PATH']}{cfg['CUM_SPECIES_GRAPH']}.png"
+        )
+        create_graphs = db_update_time > summary_graph_time
         moth_logger.debug(
             f"DB updated {db_update_time} since last summary graph update "
             f"{summary_graph_time}. "
             f"Updating summary graph"
         )
+    except FileNotFoundError:
+        create_graphs = True
+
+    if create_graphs:
         cnx = mariadb.connect(**sql_config)
         db = cnx.cursor()
+        generate_cummulative_species_graph(db)
 
-        # Update species graph
-        db.execute("SELECT year(Date) Year, Date, MothName FROM moth_records;")
-        cum_species = pd.DataFrame([list(c) for c in db], columns=list(db.column_names))
-        cum_species["Catch"] = 1
-        cum_species["Date"] = cum_species["Date"].map(
-            lambda dd: dd.replace(year=today.year)
-        )
-        cum_species.set_index(["Year", "Date", "MothName"], inplace=True)
-        cum_results = (
-            cum_species.unstack("Date")
-            .fillna(method="ffill", axis=1)
-            .groupby(by="Year")
-            .count()
-            .Catch.astype(float)
-        )  # Needs to be float for mask to work
+        # Update catch diversity graph
+        generate_monthly_species(db)
 
-        # Mask future dates to avoid plotting a horizontal line to eoy
-        cum_results.loc[today.year].mask(
-            cum_results.columns > str(today), other=np.NaN, inplace=True
-        )
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
-        ax = cum_results.transpose().plot(
-            marker="", linestyle="-", label="Species Total", **plot_dict
-        )
-        ax.xaxis.set_major_locator(MonthLocator())
-        ax.xaxis.set_major_formatter(DateFormatter("%b"))
-        ax.set_xlim([today.replace(month=1, day=1), today.replace(month=12, day=30)])
+        # Update catch volume graph
 
-        # cum_results.transpose().plot()
-        plt.savefig(f"{cfg['GRAPH_PATH']}{cfg['CUM_SPECIES_GRAPH']}")
-        plt.close()
         db.close()
         cnx.close()
-    # Update catch diversity graph
-
-    # Update catch volume graph
 
     return template(
-        "summary.tpl", summary_image_file=cfg["GRAPH_PATH"] + cfg["CUM_SPECIES_GRAPH"]
+        "summary.tpl",
+        summary_image_file=cfg["GRAPH_PATH"] + cfg["CUM_SPECIES_GRAPH"],
+        by_month_image_file=f"{cfg['GRAPH_PATH']}{cfg['BY_MONTH_GRAPH']}",
     )
 
 

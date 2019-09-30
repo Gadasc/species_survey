@@ -13,5 +13,6 @@
 <h1>Moth Summary</h1>
 <h2>Annual Species Count</h2>
 <img src={{summary_image_file}} alt="Cummulative Species Summary Graph" >
+<img src={{by_month_image_file}} alt="By Month Summary Graph" >
 </body>
 </html>
