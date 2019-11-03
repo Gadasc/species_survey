@@ -10,6 +10,7 @@ appropriately and setting u+x permissions:
 
 History
 -------
+ 3 Nov 2019 - Added Moth Bingo Grid to summary
 28 Sep 2019 - Adding Species by month graph
 17 Sep 2019 - Moving species to a view
 16 Sep 2019 - Adding logging
@@ -298,7 +299,7 @@ def get_db_update_time(use_db: bool = False) -> dt.datetime:
             f"WHERE TABLE_SCHEMA = 'cold_ash_moths' "
             f"AND table_name = 'moth_records';"
         )
-        update_time, = cursor.fetchone()
+        (update_time,) = cursor.fetchone()
         moth_logger.debug(update_time)
         cursor.close()
         cnx.close()
@@ -310,6 +311,61 @@ def get_db_update_time(use_db: bool = False) -> dt.datetime:
         moth_logger.debug(update_time)
 
     return update_time
+
+
+def get_moth_grid(db):
+    """ Returns:
+        moth_grid_ccs - string with <style> for moth_grid_container - to set columns
+        moth_grid_cells - concatinated lsit of <div> containers to be inserted <grid>
+     """
+
+    sql_species_name_by_month_year = """
+        SELECT tw.Year, tw.Month, tw.MothName
+            FROM (
+                SELECT year(Date) Year, month(Date) Month, MothName
+                    FROM moth_records
+                    GROUP BY Year, Month, MothName
+            ) tw
+        GROUP BY Year, Month, MothName;"""
+
+    db.execute(sql_species_name_by_month_year)
+    data_list = [list(c) for c in db]
+    columns = list(db.column_names)
+    species_df = pd.DataFrame(data_list, columns=columns).set_index(columns)
+
+    state = {
+        (True, True): "Seen",
+        (True, False): "Pending",
+        (False, True): "New",
+        (False, False): "ERROR!!!",
+    }
+
+    species_df["V"] = 1
+    df = species_df.unstack("Year").loc[dt.date.today().month]["V"]
+
+    cols = 5
+    # cell_count = len(df.index)
+    # pad_count = cols - cell_count % cols
+    # rows = (cell_count + pad_count) / cols
+
+    cells = [
+        f'<div class="{state[(df.loc[mn][:-1].any(), df.loc[mn][-1:].any())]} '
+        f"{'shaded' if (((i//cols)+1)+((i%cols)+1))%2 else 'unshaded'}\">{mn}</div>"
+        for i, mn in enumerate(df.index)
+    ]
+
+    cells.extend([""] * (cols - len(cells) % cols))
+
+    # Use css grid to output  a grid rather than a table
+    css = (
+        "<style>"
+        "   .moth-grid-container {"
+        f"    grid-template-rows: {'auto '* int(len(cells)/cols+1)};"
+        "}"
+        "</style>"
+    )
+
+    return css, "".join(cells)
 
 
 def generate_monthly_species(cursor):
@@ -551,9 +607,9 @@ def get_summary():
     except FileNotFoundError:
         create_graphs = True
 
+    cnx = mariadb.connect(**sql_config)
+    db = cnx.cursor()
     if create_graphs:
-        cnx = mariadb.connect(**sql_config)
-        db = cnx.cursor()
         generate_cummulative_species_graph(db)
 
         # Update catch diversity graph
@@ -561,13 +617,20 @@ def get_summary():
 
         # Update catch volume graph
 
-        db.close()
-        cnx.close()
+    # Generate moth_grid
+    grid_css, grid_cells = get_moth_grid(db)
+    # grid_ccs, grid_cells = rc
+    # print(rc[0])
+    # print(rc[1])
+    db.close()
+    cnx.close()
 
     return template(
         "summary.tpl",
         summary_image_file=cfg["GRAPH_PATH"] + cfg["CUM_SPECIES_GRAPH"],
         by_month_image_file=f"{cfg['GRAPH_PATH']}{cfg['BY_MONTH_GRAPH']}",
+        moth_grid_css=grid_css,
+        moth_grid_cells=grid_cells,
     )
 
 

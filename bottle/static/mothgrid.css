@@ -1,0 +1,34 @@
+ <style>
+            body {
+                font-family:"HelveticaNeue","Helvetica Neue",Helvetica,Arial,sans-serif;
+            }
+
+
+            .shaded {background-color: #f2f2f2;}
+            .unshaded {background-color: #fff;}
+            .Pending {color: #ddd;}
+            .Seen {color: black}
+            .New {color: red; font-weight: bold;}
+            
+            .grid-parent {
+                  display: inline-block;
+                  background-color: green;
+                  }
+            .grid-container {
+                  display: grid;
+                  grid-auto-flow: column;
+                  grid-gap: 10px;
+                  background-color: #f7f9fb;
+                  max-width:100%;
+            }
+            .grid-container > div {
+                padding: 5px;
+            }
+            .center {
+                margin: auto;
+                padding: 10px;
+                text-align: center;
+                width: 75%
+                background-color: yellow;}
+ </style>
+
