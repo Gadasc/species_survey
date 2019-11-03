@@ -354,13 +354,13 @@ def get_moth_grid(db):
         for i, mn in enumerate(df.index)
     ]
 
-    cells.extend([""] * (cols - len(cells) % cols))
+    cells.extend([""] * (cols - (len(cells) % cols)))
 
     # Use css grid to output  a grid rather than a table
     css = (
         "<style>"
         "   .moth-grid-container {"
-        f"    grid-template-rows: {'auto '* int(len(cells)/cols+1)};"
+        f"    grid-template-rows: {'auto '* int(len(cells)/cols)};"
         "}"
         "</style>"
     )
