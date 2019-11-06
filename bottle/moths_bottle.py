@@ -10,6 +10,7 @@ appropriately and setting u+x permissions:
 
 History
 -------
+ 6 Nov 2019 - Filters out 'None' from manifest
  3 Nov 2019 - Added Moth Bingo Grid to summary
 28 Sep 2019 - Adding Species by month graph
 17 Sep 2019 - Moving species to a view
@@ -127,7 +128,7 @@ def refresh_manifest():
         "Date > DATE_ADD(NOW(), INTERVAL -14 DAY) GROUP BY species;"
     )
 
-    records_dict = {row: line for row, line in enumerate(cursor)}
+    records_dict = {row: line for row, line in enumerate(cursor) if None not in line}
     recent_df = pd.DataFrame.from_dict(
         records_dict, columns=["species", "recent"], orient="index"
     )
