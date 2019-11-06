@@ -344,19 +344,22 @@ def get_moth_grid(db):
     df = species_df.unstack("Year").loc[dt.date.today().month]["V"]
 
     cols = 5
-    # cell_count = len(df.index)
-    # pad_count = cols - cell_count % cols
-    # rows = (cell_count + pad_count) / cols
+    rows = len(df.index) // cols + 1 if len(df.index) % cols else len(df.index) // cols
 
     cells = [
         f'<div class="{state[(df.loc[mn][:-1].any(), df.loc[mn][-1:].any())]} '
-        f"{'shaded' if (((i//cols)+1)+((i%cols)+1))%2 else 'unshaded'}\">{mn}</div>"
+        f"{'shaded' if (((i//rows)+1)+((i%rows)+1))%2 else 'unshaded'}\">{mn}</div>"
         for i, mn in enumerate(df.index)
     ]
 
-    cells.extend([""] * (cols - (len(cells) % cols)))
+    if len(cells) % cols:
+        cells.extend([""] * (cols - (len(cells) % cols)))
 
     # Use css grid to output  a grid rather than a table
+    print(f"No. cells: {len(cells)}")
+    print(f"No. Cols:  {cols}")
+    print(f"No. Rows:  {len(cells)//cols}")
+
     css = (
         "<style>"
         "   .moth-grid-container {"
@@ -619,9 +622,6 @@ def get_summary():
 
     # Generate moth_grid
     grid_css, grid_cells = get_moth_grid(db)
-    # grid_ccs, grid_cells = rc
-    # print(rc[0])
-    # print(rc[1])
     db.close()
     cnx.close()
 
