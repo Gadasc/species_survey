@@ -10,6 +10,7 @@ appropriately and setting u+x permissions:
 
 History
 -------
+ 8 Nov 2019 - Fixing bug where summary graph double counted
  6 Nov 2019 - Filters out 'None' from manifest
  3 Nov 2019 - Added Moth Bingo Grid to summary
 28 Sep 2019 - Adding Species by month graph
@@ -325,6 +326,7 @@ def get_moth_grid(db):
             FROM (
                 SELECT year(Date) Year, month(Date) Month, MothName
                     FROM moth_records
+                    WHERE MothName IS NOT NULL
                     GROUP BY Year, Month, MothName
             ) tw
         GROUP BY Year, Month, MothName;"""
@@ -378,27 +380,25 @@ def generate_monthly_species(cursor):
         get_summary() """
 
     moth_logger.debug(f"Creating by monthly chart")
-    sql_species_by_month_year = """
-        SELECT tw.Year, tw.Month, COUNT(tw.MothName) Species
+    sql_species_name_by_month_year = """
+        SELECT tw.Year, tw.Month, tw.MothName
         FROM (
             SELECT year(Date) Year, month(Date) Month, MothName
                 FROM moth_records
+                WHERE MothName IS NOT NULL
             GROUP BY Year, Month, MothName
         ) tw
-        GROUP BY Year, Month;"""
+        GROUP BY Year, Month, MothName;"""
 
-    cursor.execute(sql_species_by_month_year)
+    cursor.execute(sql_species_name_by_month_year)
     data_list = [list(c) for c in cursor]
-    species_df = (
-        (
-            pd.DataFrame(data_list, columns=list(cursor.column_names))
-            .set_index(["Year", "Month"])
-            .astype(np.int)
-            .unstack("Year")
-        )
-        .fillna(0)
-        .reindex(range(1, 13))
-    )
+    pre_species_df = pd.DataFrame(data_list, columns=list(cursor.column_names))
+    pre_species_df["V"] = 1
+    moth_logger.debug(pre_species_df)
+    species_df = pre_species_df.set_index(["Month", "Year", "MothName"]).unstack(
+        ["Year", "MothName"]
+    )["V"]
+
     x_labels = [dt.date(2019, mn, 1).strftime("%b") for mn in range(1, 13)]
 
     # Create chart
@@ -407,10 +407,17 @@ def generate_monthly_species(cursor):
     ax = fig.add_subplot(111)
 
     ax.bar(
-        x_labels, species_df.sum(axis="columns").values, color="#909090", label="All"
+        x_labels,
+        species_df.any(axis="columns", level=1).sum(axis="columns").values,
+        color="#909090",
+        label="All",
     )
     ax.bar(
-        x_labels, species_df.Species[this_year], width=0.5, color="b", label=this_year
+        x_labels,
+        species_df[this_year].sum(axis="columns"),
+        width=0.5,
+        color="b",
+        label=this_year,
     )
     ax.legend()
 
@@ -605,7 +612,7 @@ def get_summary():
         create_graphs = db_update_time > summary_graph_time
         moth_logger.debug(
             f"DB updated {db_update_time} since last summary graph update "
-            f"{summary_graph_time}. "
+            f"{summary_graph_time}. \n"
             f"Updating summary graph"
         )
     except FileNotFoundError:
