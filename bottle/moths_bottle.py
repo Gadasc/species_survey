@@ -10,6 +10,7 @@ appropriately and setting u+x permissions:
 
 History
 -------
+10 Nov 2019 - On submit - redirect to /latest instead of creating a new page
  8 Nov 2019 - Fixing bug where summary graph double counted
  6 Nov 2019 - Filters out 'None' from manifest
  3 Nov 2019 - Added Moth Bingo Grid to summary
@@ -178,6 +179,9 @@ def generate_records_file(cursor, date_dash_str):
     )
     records_dict = {}
     for mn, mc in cursor:
+        if mn is None:
+            continue  # The latest table shows when no moths were caught
+
         moth_logger.debug(f"{mn}: {str(mc)}")
         records_dict[mn.replace(" ", "_")] = str(mc)
 
@@ -720,34 +724,16 @@ def survey_handler():
             rs.append(f"<p><strong>{moth}</strong>      {specimens}</p>")
             results_dict[moth] = str(specimens)
 
-    output = "<!DOCTYPE html><html><head><TITLE>Survey Results</TITLE></head>"
-    output += "<body><H1>Moths Survey</H1>"
-    output += "Date: " + str(date_string) + "</p>"
+    # Store results locally  so when survey sheet is recalled it will auto populate
+    with open(fout_json, "w") as fout_js:
+        fout_js.write(json.dumps(results_dict))
 
     # Get a connection to the databe
     cnx = mariadb.connect(**sql_config)
     cursor = cnx.cursor()
-
-    # Store results locally  so when survey sheet is recalled it will auto populate
-    with open(fout_json, "w") as fout_js:
-        fout_js.write(json.dumps(results_dict))
-    # Build table and store resolve in a csv file.
-    output += "<table><th>Species</th><th>Count</th>"
-    for species, count in results_dict.items():
-        output += "<tr><td>{}</td><td>{}<td>".format(species.replace("_", " "), count)
-
-    output += "</table>"
-    output += '<a href="/survey">Survey Sheet</a>'
-
     update_moth_database(cursor, date_string, results_dict)
-
-    # Update a table showing the historical data for last two weeks.
-    output += show_latest_moths(cursor)
-    output += "</body></html>"
-
     cnx.close()
-
-    return output
+    return show_latest()
 
 
 @app.route("/debug")
