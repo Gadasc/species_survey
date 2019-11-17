@@ -10,6 +10,7 @@ appropriately and setting u+x permissions:
 
 History
 -------
+17 Nov 2019 - Add /species page to show most popular species
 10 Nov 2019 - On submit - redirect to /latest instead of creating a new page
  8 Nov 2019 - Fixing bug where summary graph double counted
  6 Nov 2019 - Filters out 'None' from manifest
@@ -51,6 +52,9 @@ import html
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 TEMPLATE_PATH.insert(0, os.getcwd())
+
+# Override the pandas' max display width to prevent to_html truncating cols
+pd.set_option("display.max_colwidth", -1)
 
 # Format information for plot
 plot_dict = {"figsize": (10, 4.5)}
@@ -556,6 +560,39 @@ def server_graphs(species):
     """ Helper route to return a graph image as a static file. """
     species = species.replace("%20", " ")
     return static_file(f"{species}.png", root=cfg["GRAPH_PATH"])
+
+
+@app.route("/species")
+def species():
+    """ Show  list of moths caught to date. """
+    sql_string = """
+        SELECT MothName Species, ceil(avg(Total)) "Annual Average"
+            FROM (
+                SELECT Year(Date) Year, MothName, Sum(MothCount) Total
+                    FROM moth_records
+                    GROUP BY Year, MothName
+            ) yt GROUP BY MothName ORDER BY avg(Total) DESC;"""
+
+    cnx = mariadb.connect(**sql_config)
+    cursor = cnx.cursor()
+
+    cursor.execute(sql_string)
+    data_list = [list(c) for c in cursor]
+    sql_df = pd.DataFrame(data_list, columns=list(cursor.column_names))
+
+    cursor.close()
+    cnx.close()
+
+    # Tidy table
+    # Add links
+    sql_df["Species"] = sql_df["Species"].map(
+        lambda s: f'<a href="/species/{s}">{s}</a>', na_action="ignore"
+    )
+
+    return template(
+        "species_summary.tpl",
+        species_table=sql_df.to_html(escape=False, index=False, justify="left"),
+    )
 
 
 @app.route("/")
