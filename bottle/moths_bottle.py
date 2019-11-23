@@ -11,6 +11,7 @@ appropriately and setting u+x permissions:
 History
 -------
 
+23 Nov 2019 - Adding /family pagesd
 21 Nov 2019 - Add /genus page (also good for aggregations)
 17 Nov 2019 - Add /species page to show most popular species
 10 Nov 2019 - On submit - redirect to /latest instead of creating a new page
@@ -664,6 +665,55 @@ def get_genus(genus):
     )
 
 
+@app.route("/family/<family>")
+def get_family(family):
+    """ Show the species in a given family and graph the aggregation. """
+    sql_string = (
+        """
+        SELECT Date, moth_records.MothName, MothFamily, sum(MothCount) MothCount
+        FROM moth_records INNER JOIN taxonomy
+            ON moth_records.MothName = taxonomy.MothName
+        WHERE MothFamily LIKE """
+        + f'"{family}" GROUP BY Date;'
+    )
+
+    catches_df = get_table(sql_string)
+    today = dt.date.today()
+    this_year = today.year
+    date_year_index = pd.DatetimeIndex(
+        pd.date_range(
+            start=today.replace(month=1, day=1), end=today.replace(month=12, day=31)
+        )
+    )
+
+    # Need to average by date
+    catches_df["Year"] = catches_df.Date.apply(lambda d: d.timetuple().tm_year)
+    catches_df["Date"] = catches_df.Date.apply(lambda d: d.replace(year=this_year))
+
+    table_df = (
+        catches_df.drop(["MothName", "MothFamily"], "columns")
+        .set_index(["Year", "Date"])
+        .unstack("Year")
+        .fillna(0)["MothCount"]
+        .astype(float)
+    )
+
+    table_df["Mean"] = table_df.mean(axis="columns")
+    ax = (
+        table_df.reindex(date_year_index)
+        .fillna(0)[["Mean", this_year]]
+        .plot(**plot_dict)
+    )
+    ax.set_title(f"Family:{family}")
+    ax.set_ylim(bottom=0)
+    plt.savefig(f"{GRAPH_PATH}{family}.png")
+    plt.close()
+
+    return template(
+        "family_summary.tpl", family=family, species=catches_df.MothName.unique()
+    )
+
+
 @app.route("/")
 def index():
     """ Landing page for the web site. """
@@ -781,7 +831,8 @@ def get_species(species):
             0
         ]
         taxo_str = (
-            f'<ul style="list-style-type: none;"<li>{t.MothFamily}</li>'
+            f'<ul style="list-style-type: none;">'
+            f'<li><a href="/family/{t.MothFamily}">{t.MothFamily}</a></li>'
             f'<ul style="list-style-type: none;"><li>&#9492;{t.MothSubFamily}</li>'
             f'<ul style="list-style-type: none;">'
             f'<li>&#9492;<a href="/genus/{t.MothGenus}">{t.MothGenus}</a></li>'
