@@ -10,6 +10,7 @@ appropriately and setting u+x permissions:
 
 History
 -------
+
 21 Nov 2019 - Add /genus page (also good for aggregations)
 17 Nov 2019 - Add /species page to show most popular species
 10 Nov 2019 - On submit - redirect to /latest instead of creating a new page
@@ -780,8 +781,11 @@ def get_species(species):
             0
         ]
         taxo_str = (
-            f"{t.MothFamily} - {t.MothSubFamily} - "
-            f'<a=href="/genus/{t.MothGenus}">{t.MothGenus}</a> - {t.MothSpecies}'
+            f"<ul><li>{t.MothFamily}</li>"
+            f"<ul><li>{t.MothSubFamily}</li>"
+            f'<ul><li><a href="/genus/{t.MothGenus}">{t.MothGenus}</a></li>'
+            f"<ul><li>{t.MothSpecies}"</li>"
+            f"</ul></ul></ul></ul>"
         )
 
         # Produce a graph of these
