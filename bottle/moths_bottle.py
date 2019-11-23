@@ -781,10 +781,11 @@ def get_species(species):
             0
         ]
         taxo_str = (
-            f"<ul><li>{t.MothFamily}</li>"
-            f"<ul><li>{t.MothSubFamily}</li>"
-            f'<ul><li><a href="/genus/{t.MothGenus}">{t.MothGenus}</a></li>'
-            f"<ul><li>{t.MothSpecies}"</li>"
+            f'<ul style="list-style-type: none;"<li>{t.MothFamily}</li>'
+            f'<ul style="list-style-type: none;"><li>&#9492;{t.MothSubFamily}</li>'
+            f'<ul style="list-style-type: none;">'
+            f'<li>&#9492;<a href="/genus/{t.MothGenus}">{t.MothGenus}</a></li>'
+            f'<ul style="list-style-type: none;"><li>&#9492;{t.MothSpecies}</li>'
             f"</ul></ul></ul></ul>"
         )
 

@@ -11,7 +11,7 @@
 <body>
 % include("menu_moth.tpl")
 <h1>{{species}}</h1>
-<h2>{{!taxonomy}}</h2>
+<div>{{!taxonomy}}</div>
 
 <div style="position: relative;">
 <img style="position: relative; top: 0px; left: 0px;" src="/graphs/{{species}}" />
