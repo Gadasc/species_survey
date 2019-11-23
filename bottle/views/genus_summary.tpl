@@ -10,16 +10,23 @@
 
 <body>
 % include("menu_moth.tpl")
-<h1>{{species}}</h1>
-<h2>{{!taxonomy}}</h2>
+<h1>{{genus}}</h1>
 
 <div style="position: relative;">
-<img style="position: relative; top: 0px; left: 0px;" src="/graphs/{{species}}" />
+<img style="position: relative; top: 0px; left: 0px;" src="/graphs/{{genus}}" />
 <img style="position: absolute; top: 0px; left: 0px;" src="/graphs/date_overlay" />
 </div>
 
 <div>
-{{!catches}}
+<ul>
+<%
+list_items = ""
+for s in species:
+    list_items += f"<li><a href='/species/{s}'>{s}</a></li>"
+    end
+%>
+{{!list_items}}
+</ul>
 </div>
 
 

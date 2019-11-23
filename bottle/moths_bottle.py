@@ -10,6 +10,7 @@ appropriately and setting u+x permissions:
 
 History
 -------
+21 Nov 2019 - Add /genus page (also good for aggregations)
 17 Nov 2019 - Add /species page to show most popular species
 10 Nov 2019 - On submit - redirect to /latest instead of creating a new page
  8 Nov 2019 - Fixing bug where summary graph double counted
@@ -82,6 +83,23 @@ file_handler = logging.handlers.RotatingFileHandler(
 formatter = logging.Formatter("%(msg)s")
 file_handler.setFormatter(formatter)
 requests_logger.addHandler(file_handler)
+
+
+def get_table(sql_query):
+    """ Creates a pandas DataFrame from a SQL Query"""
+
+    # Establish a connection to the SQL server
+    print(sql_config)
+    cnx = mariadb.connect(**sql_config)
+    cursor = cnx.cursor()
+
+    cursor.execute(sql_query)
+    data_list = [list(c) for c in cursor]
+    count_df = pd.DataFrame(data_list, columns=list(cursor.column_names))
+
+    cursor.close()
+    cnx.close()
+    return count_df
 
 
 def log_to_logger(fn):
@@ -223,6 +241,7 @@ def show_latest_moths(cursor):
     return recent_df.unstack("Date").fillna("").to_html(escape=False, justify="left")
 
 
+# ToDo: Refactor using get_table
 def get_moth_catches(moth_name: str):
     query_str = (
         f"select Date, MothCount from moth_records "
@@ -232,7 +251,6 @@ def get_moth_catches(moth_name: str):
     # Establish a connection to the SQL server
     cnx = mariadb.connect(**sql_config)
     cursor = cnx.cursor()
-
     cursor.execute(query_str)
     columns = list(cursor.column_names)
     # debug(columns)
@@ -245,6 +263,7 @@ def get_moth_catches(moth_name: str):
     return survey_df
 
 
+# ToDo: Refactor using get_table
 def get_moths_list():
     query_str = f"SELECT MothName FROM moth_records GROUP BY MothName;"
 
@@ -572,7 +591,7 @@ def species():
                     FROM moth_records
                     GROUP BY Year, MothName
             ) yt GROUP BY MothName ORDER BY avg(Total) DESC;"""
-
+    print(sql_config)
     cnx = mariadb.connect(**sql_config)
     cursor = cnx.cursor()
 
@@ -592,6 +611,55 @@ def species():
     return template(
         "species_summary.tpl",
         species_table=sql_df.to_html(escape=False, index=False, justify="left"),
+    )
+
+
+@app.route("/genus/<genus>")
+def get_genus(genus):
+    """ Show the species in a given genus and graph the aggregation. """
+    sql_string = (
+        """
+        SELECT Date, moth_records.MothName, MothGenus, sum(MothCount) MothCount
+        FROM moth_records INNER JOIN taxonomy
+            ON moth_records.MothName = taxonomy.MothName
+        WHERE MothGenus LIKE """
+        + f'"{genus}" GROUP BY Date;'
+    )
+
+    catches_df = get_table(sql_string)
+    today = dt.date.today()
+    this_year = today.year
+    date_year_index = pd.DatetimeIndex(
+        pd.date_range(
+            start=today.replace(month=1, day=1), end=today.replace(month=12, day=31)
+        )
+    )
+
+    # Need to average by date
+    catches_df["Year"] = catches_df.Date.apply(lambda d: d.timetuple().tm_year)
+    catches_df["Date"] = catches_df.Date.apply(lambda d: d.replace(year=this_year))
+
+    table_df = (
+        catches_df.drop(["MothName", "MothGenus"], "columns")
+        .set_index(["Year", "Date"])
+        .unstack("Year")
+        .fillna(0)["MothCount"]
+        .astype(float)
+    )
+
+    table_df["Mean"] = table_df.mean(axis="columns")
+    ax = (
+        table_df.reindex(date_year_index)
+        .fillna(0)[["Mean", this_year]]
+        .plot(**plot_dict)
+    )
+    ax.set_title(f"Genus:{genus}")
+    ax.set_ylim(bottom=0)
+    plt.savefig(f"{GRAPH_PATH}{genus}.png")
+    plt.close()
+
+    return template(
+        "genus_summary.tpl", genus=genus, species=catches_df.MothName.unique()
     )
 
 
@@ -708,6 +776,14 @@ def get_species(species):
     if len(unique_species) == 1:
         species = unique_species[0]
 
+        t = get_table(f'SELECT * from taxonomy WHERE MothName like "{species}";').iloc[
+            0
+        ]
+        taxo_str = (
+            f"{t.MothFamily} - {t.MothSubFamily} - "
+            f'<a=href="/genus/{t.MothGenus}">{t.MothGenus}</a> - {t.MothSpecies}'
+        )
+
         # Produce a graph of these
         graph_date_overlay()
         graph_mothname_v2(species)
@@ -715,7 +791,9 @@ def get_species(species):
         table_text = all_survey_df[["Date", "MothName", "MothCount"]].to_html(
             escape=False, index=False
         )
-        return template("species.tpl", species=species, catches=table_text)
+        return template(
+            "species.tpl", species=species, catches=table_text, taxonomy=taxo_str
+        )
 
     else:
         # There are multiple species - so provide the choice
