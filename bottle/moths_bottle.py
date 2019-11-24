@@ -10,7 +10,7 @@ appropriately and setting u+x permissions:
 
 History
 -------
-
+24 Nov 2019 - Adding summary pages for genus and family
 23 Nov 2019 - Adding /family pagesd
 21 Nov 2019 - Add /genus page (also good for aggregations)
 17 Nov 2019 - Add /species page to show most popular species
@@ -593,18 +593,20 @@ def species():
                     FROM moth_records
                     GROUP BY Year, MothName
             ) yt GROUP BY MothName ORDER BY avg(Total) DESC;"""
-    print(sql_config)
-    cnx = mariadb.connect(**sql_config)
-    cursor = cnx.cursor()
 
-    cursor.execute(sql_string)
-    data_list = [list(c) for c in cursor]
-    sql_df = pd.DataFrame(data_list, columns=list(cursor.column_names))
+    # print(sql_config)
+    # cnx = mariadb.connect(**sql_config)
+    # cursor = cnx.cursor()
 
-    cursor.close()
-    cnx.close()
+    # cursor.execute(sql_string)
+    # data_list = [list(c) for c in cursor]
+    # sql_df = pd.DataFrame(data_list, columns=list(cursor.column_names))
 
-    # Tidy table
+    # cursor.close()
+    # cnx.close()
+
+    sql_df = get_table(sql_string)
+
     # Add links
     sql_df["Species"] = sql_df["Species"].map(
         lambda s: f'<a href="/species/{s}">{s}</a>', na_action="ignore"
@@ -612,19 +614,81 @@ def species():
 
     return template(
         "species_summary.tpl",
+        title="Species Summary",
         species_table=sql_df.to_html(escape=False, index=False, justify="left"),
     )
 
 
+def get_genus_list():
+    """ Show list of moths caught to date. """
+
+    sql_string = """
+    SELECT MothGenus Genus, ceil(avg(Count)) `Annual Average` FROM
+    (
+        SELECT year(Date) Year,  MothGenus,  sum(MothCount) Count
+            FROM moth_records INNER JOIN taxonomy
+                ON moth_records.MothName = taxonomy.MothName
+            GROUP BY Year, MothGenus
+    ) gc
+    GROUP BY Genus ORDER BY `Annual Average` DESC;"""
+
+    sql_df = get_table(sql_string)
+
+    # Add links
+    sql_df["Genus"] = sql_df["Genus"].map(
+        lambda s: f'<a href="/genus/{s}">{s}</a>', na_action="ignore"
+    )
+
+    return template(
+        "species_summary.tpl",
+        title="Genus Summary",
+        species_table=sql_df.to_html(escape=False, index=False, justify="left"),
+    )
+
+
+def get_family_list():
+    """ Show list of moths caught to date. """
+
+    sql_string = """
+    SELECT MothFamily Family, ceil(avg(Count)) `Annual Average` FROM
+    (
+        SELECT year(Date) Year,  MothFamily,  sum(MothCount) Count
+            FROM moth_records INNER JOIN taxonomy
+                ON moth_records.MothName = taxonomy.MothName
+            GROUP BY Year, MothFamily
+    ) gc
+    GROUP BY Family ORDER BY `Annual Average` DESC;"""
+
+    sql_df = get_table(sql_string)
+
+    # Add links
+    sql_df["Family"] = sql_df["Family"].map(
+        lambda s: f'<a href="/family/{s}">{s}</a>', na_action="ignore"
+    )
+
+    return template(
+        "species_summary.tpl",
+        title="Family Summary",
+        species_table=sql_df.to_html(escape=False, index=False, justify="left"),
+    )
+
+
+@app.route("/genus")
 @app.route("/genus/<genus>")
-def get_genus(genus):
-    """ Show the species in a given genus and graph the aggregation. """
+def get_genus(genus=None):
+    """ Show the species in a given genus and graph the aggregation.
+        If genus is None then present and ordered list of genus by
+        average moth count"""
+
+    if genus is None:
+        return get_genus_list()
+
     sql_string = (
         """
-        SELECT Date, moth_records.MothName, MothGenus, sum(MothCount) MothCount
-        FROM moth_records INNER JOIN taxonomy
-            ON moth_records.MothName = taxonomy.MothName
-        WHERE MothGenus LIKE """
+            SELECT Date, moth_records.MothName, MothGenus, sum(MothCount) MothCount
+            FROM moth_records INNER JOIN taxonomy
+                ON moth_records.MothName = taxonomy.MothName
+            WHERE MothGenus LIKE """
         + f'"{genus}" GROUP BY Date;'
     )
 
@@ -665,9 +729,14 @@ def get_genus(genus):
     )
 
 
+@app.route("/family")
 @app.route("/family/<family>")
-def get_family(family):
+def get_family(family=None):
     """ Show the species in a given family and graph the aggregation. """
+
+    if family is None:
+        return get_family_list()
+
     sql_string = (
         """
         SELECT Date, moth_records.MothName, MothFamily, sum(MothCount) MothCount

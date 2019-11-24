@@ -10,7 +10,7 @@
 
 <body>
 % include("menu_moth.tpl")
-<h1>Species Summary</h1>
+<h1>{{title}}</h1>
 
 <div>
 {{!species_table}}
