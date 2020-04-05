@@ -10,6 +10,9 @@ appropriately and setting u+x permissions:
 
 History
 -------
+ 4 Apr 2020 - Change column width control to None from -1 due to deprication warning
+26 Mar 2020 - Adding timestamp to debug wrapper
+13 Mar 2020 - Adding debug wrapper
 24 Nov 2019 - Adding summary pages for genus and family
 23 Nov 2019 - Adding /family pagesd
 21 Nov 2019 - Add /genus page (also good for aggregations)
@@ -57,7 +60,7 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 TEMPLATE_PATH.insert(0, os.getcwd())
 
 # Override the pandas' max display width to prevent to_html truncating cols
-pd.set_option("display.max_colwidth", -1)
+pd.set_option("display.max_colwidth", None)
 
 # Format information for plot
 plot_dict = {"figsize": (10, 4.5)}
@@ -91,7 +94,7 @@ def get_table(sql_query):
     """ Creates a pandas DataFrame from a SQL Query"""
 
     # Establish a connection to the SQL server
-    print(sql_config)
+    #print(sql_config)
     cnx = mariadb.connect(**sql_config)
     cursor = cnx.cursor()
 
@@ -104,11 +107,19 @@ def get_table(sql_query):
     return count_df
 
 
+def debug(fn):
+    @wraps(fn)
+    def debug_fn(*args, **kwds):
+        moth_logger.debug(f">>>: {dt.datetime.now()} :: {fn.__name__}")
+        retcode = fn(*args, **kwds)
+        moth_logger.debug(f"<<<: {dt.datetime.now()} :: {fn.__name__}")
+        return retcode
+    return debug_fn
+
+
 def log_to_logger(fn):
-    """
-    Wrap a Bottle request so that a log line is emitted after it's handled.
-    (This decorator can be extended to take the desired logger as a param.)
-    """
+    """ Wrap a Bottle request so that a log line is emitted after it's handled.
+    (This decorator can be extended to take the desired logger as a param.) """
 
     @wraps(fn)
     def _log_to_logger(*args, **kwargs):
@@ -215,7 +226,7 @@ def generate_records_file(cursor, date_dash_str):
     ) as json_out:
         json_out.write(json.dumps(records_dict))
 
-
+@debug
 def show_latest_moths(cursor):
     """ Generate a table showing the latest records.
         Because we are using mysql.connector instead sqlalchemy which ORM we
@@ -388,9 +399,9 @@ def get_moth_grid(db):
         cells.extend([""] * (cols - (len(cells) % cols)))
 
     # Use css grid to output  a grid rather than a table
-    print(f"No. cells: {len(cells)}")
-    print(f"No. Cols:  {cols}")
-    print(f"No. Rows:  {len(cells)//cols}")
+    #print(f"No. cells: {len(cells)}")
+    #print(f"No. Cols:  {cols}")
+    #print(f"No. Rows:  {len(cells)//cols}")
 
     css = (
         "<style>"
@@ -577,6 +588,7 @@ app.install(log_to_logger)  # Logs html requests to a file
 
 
 @app.route("/graphs/<species>")
+@debug
 def server_graphs(species):
     """ Helper route to return a graph image as a static file. """
     species = species.replace("%20", " ")
@@ -584,6 +596,7 @@ def server_graphs(species):
 
 
 @app.route("/species")
+@debug
 def species():
     """ Show  list of moths caught to date. """
     sql_string = """
@@ -675,6 +688,7 @@ def get_family_list():
 
 @app.route("/genus")
 @app.route("/genus/<genus>")
+@debug
 def get_genus(genus=None):
     """ Show the species in a given genus and graph the aggregation.
         If genus is None then present and ordered list of genus by
@@ -731,6 +745,7 @@ def get_genus(genus=None):
 
 @app.route("/family")
 @app.route("/family/<family>")
+@debug
 def get_family(family=None):
     """ Show the species in a given family and graph the aggregation. """
 
@@ -784,6 +799,7 @@ def get_family(family=None):
 
 
 @app.route("/")
+@debug
 def index():
     """ Landing page for the web site. """
     # Display a landing page
@@ -791,6 +807,7 @@ def index():
 
 
 @app.route("/static/<filename>")
+@debug
 def service_static_file(filename):
     """ Help route to return static files. """
     return static_file(f"{filename}", root=cfg["STATIC_PATH"])
@@ -798,6 +815,7 @@ def service_static_file(filename):
 
 @app.route("/survey")
 @app.route("/survey/<dash_date_str:re:\\d{4}-\\d{2}-\\d{2}>")
+@debug
 def serve_survey(dash_date_str=None):
     """ Generate a survey sheet to records today's results in. """
     cnx = mariadb.connect(**sql_config)
@@ -826,6 +844,7 @@ def serve_survey(dash_date_str=None):
 
 
 @app.route("/summary")
+@debug
 def get_summary():
     """ Display an overall summary for the Moths web-site. """
     create_graphs = False
@@ -870,8 +889,8 @@ def get_summary():
         moth_grid_cells=grid_cells,
     )
 
-
 @app.route("/species/<species>")
+@debug
 def get_species(species):
     """ Generate a summary page for the specified moth species.
         Use % as a wildcard.
@@ -931,6 +950,7 @@ def get_species(species):
 
 
 @app.route("/latest")
+@debug
 def show_latest():
     """ Shows the latest moth catches. """
     # Get a connection to the databe
@@ -944,6 +964,7 @@ def show_latest():
 
 
 @app.post("/handle_survey")
+@debug
 def survey_handler():
     """ Handler to manage the data returned from the survey sheet. """
     #    today_string = dt.datetime.now()
@@ -977,6 +998,7 @@ def survey_handler():
 
 
 @app.route("/debug")
+@debug
 def debug_info():
     """ Route showing some debug.
     """
@@ -984,6 +1006,7 @@ def debug_info():
 
 
 @app.route("/help")
+@debug
 def survey_help():
     """ Displays a list of links to possible pages """
     output = str()
@@ -1009,4 +1032,8 @@ if __name__ == "__main__":
     #    app = ProfilerMiddleware(app,
     #                             profile_dir = '/var/www/profile',
     #                             filename_format = "moths_bottle_{time}.prof")
+
+    app.catchall = False
     bottle.run(app=app, debug=True, reloader=True, host=cfg["HOST"], port=cfg["PORT"])
+
+#20200329 10:07
