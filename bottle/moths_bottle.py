@@ -1,4 +1,4 @@
-#! /usr/local/bin/python3.7
+#! /usr/local/bin/python3
 
 """
 moth_bottle.py
@@ -94,7 +94,7 @@ def get_table(sql_query):
     """ Creates a pandas DataFrame from a SQL Query"""
 
     # Establish a connection to the SQL server
-    #print(sql_config)
+    # print(sql_config)
     cnx = mariadb.connect(**sql_config)
     cursor = cnx.cursor()
 
@@ -114,6 +114,7 @@ def debug(fn):
         retcode = fn(*args, **kwds)
         moth_logger.debug(f"<<<: {dt.datetime.now()} :: {fn.__name__}")
         return retcode
+
     return debug_fn
 
 
@@ -225,6 +226,7 @@ def generate_records_file(cursor, date_dash_str):
         f"{cfg['RECORDS_PATH']}day_count_{date_dash_str.replace('-','')}.json", "w"
     ) as json_out:
         json_out.write(json.dumps(records_dict))
+
 
 @debug
 def show_latest_moths(cursor):
@@ -399,9 +401,9 @@ def get_moth_grid(db):
         cells.extend([""] * (cols - (len(cells) % cols)))
 
     # Use css grid to output  a grid rather than a table
-    #print(f"No. cells: {len(cells)}")
-    #print(f"No. Cols:  {cols}")
-    #print(f"No. Rows:  {len(cells)//cols}")
+    # print(f"No. cells: {len(cells)}")
+    # print(f"No. Cols:  {cols}")
+    # print(f"No. Rows:  {len(cells)//cols}")
 
     css = (
         "<style>"
@@ -843,6 +845,43 @@ def serve_survey(dash_date_str=None):
     return template("survey.tpl", records=records, dash_date_str=dash_date_str)
 
 
+@app.route("/survey2")
+@app.route("/survey2/<dash_date_str:re:\\d{4}-\\d{2}-\\d{2}>")
+@debug
+def serve_survey2(dash_date_str=None):
+    """ Generate a survey sheet to records today's results in. """
+    cnx = mariadb.connect(**sql_config)
+    db = cnx.cursor()
+
+    if dash_date_str:
+        generate_records_file(db, dash_date_str)
+        # TODO we may want to just remove the manifest to simplify the historical
+        # survey sheet.
+    else:
+        dash_date_str = dt.date.today().strftime("%Y-%m-%d")
+        refresh_manifest()  # The manifest shows the moths that could be caught
+
+    try:
+        date_str = dash_date_str.replace("-", "")
+        with open(f"{cfg['RECORDS_PATH']}day_count_{date_str}.json") as json_in:
+            records = json.load(json_in)
+        # records is a dictionary whose keys have been managled " " replaced with "_"
+        unmangled_records = [
+            {"species": k.replace("_", " "), "count": int(v)}
+            for k, v in records.items()
+        ]
+    except FileNotFoundError:
+        records = {}
+
+    moth_logger.debug(f"Recent moths:{str(unmangled_records)}")
+    db.close()
+    cnx.close()
+
+    return template(
+        "vue_survey.tpl", records=unmangled_records, dash_date_str=dash_date_str
+    )
+
+
 @app.route("/summary")
 @debug
 def get_summary():
@@ -888,6 +927,7 @@ def get_summary():
         moth_grid_css=grid_css,
         moth_grid_cells=grid_cells,
     )
+
 
 @app.route("/species/<species>")
 @debug
@@ -1034,6 +1074,13 @@ if __name__ == "__main__":
     #                             filename_format = "moths_bottle_{time}.prof")
 
     app.catchall = False
-    bottle.run(app=app, debug=True, reloader=True, host=cfg["HOST"], port=cfg["PORT"])
+    bottle.run(
+        app=app,
+        debug=True,
+        reloader=True,
+        host=cfg["HOST"],
+        port=cfg["PORT"],
+        server="waitress",
+    )
 
-#20200329 10:07
+# 20200329 10:07
