@@ -160,7 +160,7 @@
             return {
                 manifest_moths: [], 
                 captured_moths: [],
-                moths: []
+                //moths: []
             }
         },
         //props: ["moths"],
@@ -174,11 +174,15 @@
             // create a lower case list of moth names that are already in the survey sheet.
             // The match list can use this to avoid duplicates
             current_moths: function(){
-                return this.manifest_moths.map(function(item){return item.species.toLowerCase();});
+                return this.moths.map(function(item){return item.species.toLowerCase();});
             },
-            //moths: function() {
-            //    return this.manifest_moths.map(function(item, index){return true});      
-            //}   
+            moths: function() {
+                // combine manifest_moths and captured moths
+                var all_moths = []
+                this.manifest_moths.forEach(function(item, index){all_moths.push(item)});
+                this.captured_moths.forEach(function(item, index){all_moths.push(item)});
+                return all_moths;      
+            }   
             //this.captured_moths.foreach(function(elem, index){console.log(elem.species);});
         }
         
@@ -186,7 +190,7 @@
     })
     vm.manifest_moths = recent_moths;
     vm.captured_moths = {{!records}};
-    vm.moths = recent_moths;
+    //vm.moths = recent_moths;
 </script>
 
 <style>
