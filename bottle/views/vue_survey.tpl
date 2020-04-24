@@ -26,7 +26,7 @@
                    <td>\{\{moth_record.species\}\}</td>
                    <td class="recent">\{\{moth_record.recent\}\}</td>
                    <td><button class="round_button" v-on:click='decrement'>-</button></td>
-                   <td class="count">\{\{moth_record.count\}\}</td>
+                   <td><input class="count" v-bind:name="moth_record.species" v-model="moth_record.count"></td>
                    <td><button class="round_button" v-on:click="increment">+</button></td>
                    </tr>
                    `,
@@ -144,7 +144,8 @@
         el: '#app',
         template: `    
         <div>
-        <p>Date: {{!dash_date_str}}</p>
+        <form id="mothsForm" autocomplete="off" action="/form_get">
+        Date: <input type="text" name="dash_date_str"  value="{{!dash_date_str}}" readonly></p>
         <table>
         <thead><tr><th>Species</th><th>Recent</th><th></th><th>Count</th><th></th></tr></thead>
         <tbody>
@@ -153,14 +154,16 @@
             <moth-entry v-for="moth in moths" v-bind:key='moth.species' v-bind:moth_record='moth' />
         </tbody>
         </table>
+        <button type="submit">Submit</button>
+        </form>
         </div>
         `,
        
         data: function() {
             return {
-                manifest_moths: [], 
-                captured_moths: [],
-                //moths: []
+                //manifest_moths: [], 
+                //captured_moths: [],
+                moths: []
             }
         },
         //props: ["moths"],
@@ -176,21 +179,40 @@
             current_moths: function(){
                 return this.moths.map(function(item){return item.species.toLowerCase();});
             },
-            moths: function() {
-                // combine manifest_moths and captured moths
-                var all_moths = []
-                this.manifest_moths.forEach(function(item, index){all_moths.push(item)});
-                this.captured_moths.forEach(function(item, index){all_moths.push(item)});
-                return all_moths;      
-            }   
-            //this.captured_moths.foreach(function(elem, index){console.log(elem.species);});
         }
         
         
     })
-    vm.manifest_moths = recent_moths;
-    vm.captured_moths = {{!records}};
-    //vm.moths = recent_moths;
+
+    // On load we want to combine the likely moths from the manifest and the recently seen moths.
+    // This combination is not reactive so can be done once on load. 
+
+    manifest_moths = recent_moths;
+    captured_moths = {{!records}};
+    // combine manifest_moths and captured moths
+    var all_moths = []
+    // First add recently seen species from the manifest
+    manifest_moths.forEach(function(item, index){all_moths.push(item)});
+    
+    // Now add anything already recorded for this date, add if not a recent species, and update
+    // record if it already exists.
+    captured_moths.forEach(function(item, index){
+        // If exists - find index and update record
+        first_match = all_moths.findIndex(function(v){return (v.species == item.species)});
+        if (first_match !== -1) {
+            // Find index
+            console.log("Found duplicate record for " + item.species + " at: " + first_match);
+            // Update record only if the record is null
+            all_moths[first_match].count = item.count;
+        // else add to list
+        } else {
+            all_moths.push(item);
+        }
+    });
+
+    // Finally sort
+    vm.moths = all_moths.sort(function(i1, i2){return i1.species.localeCompare(i2.species)});      
+
 </script>
 
 <style>

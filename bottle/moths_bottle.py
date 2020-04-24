@@ -865,13 +865,13 @@ def serve_survey2(dash_date_str=None):
         date_str = dash_date_str.replace("-", "")
         with open(f"{cfg['RECORDS_PATH']}day_count_{date_str}.json") as json_in:
             records = json.load(json_in)
-        # records is a dictionary whose keys have been managled " " replaced with "_"
-        unmangled_records = [
-            {"species": k.replace("_", " "), "count": int(v)}
-            for k, v in records.items()
-        ]
+            # records is a dict whose keys have been managled " " replaced with "_"
+            unmangled_records = [
+                {"species": k.replace("_", " "), "count": int(v), "recent": 0}
+                for k, v in records.items()
+            ]
     except FileNotFoundError:
-        records = {}
+        unmangled_records = []
 
     moth_logger.debug(f"Recent moths:{str(unmangled_records)}")
     db.close()
@@ -1043,6 +1043,11 @@ def debug_info():
     """ Route showing some debug.
     """
     return [str(route.__dict__) + "</p>" for route in app.routes]
+
+
+@app.route("/form_get")
+def echo_form():
+    return [str(request.query_string)]
 
 
 @app.route("/help")
