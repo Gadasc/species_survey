@@ -10,6 +10,9 @@ appropriately and setting u+x permissions:
 
 History
 -------
+13 Apr 2020 - Trying to run in a waitress server
+ 9 Apr 2020 - Fixing Genus and family summaries where nothing caught in the current yr
+ 9 Apr 2020 - removed double import of bottle and added pre and post hooks as debug
  4 Apr 2020 - Change column width control to None from -1 due to deprication warning
 26 Mar 2020 - Adding timestamp to debug wrapper
 13 Mar 2020 - Adding debug wrapper
@@ -38,8 +41,7 @@ History
 """
 
 from app_config import app_config as cfg
-import bottle
-from bottle import Bottle, template, static_file, TEMPLATE_PATH, request, response
+from bottle import Bottle, template, static_file, TEMPLATE_PATH, request, response, run
 import pandas as pd
 import mysql.connector as mariadb
 from sql_config import sql_config
@@ -536,6 +538,7 @@ def graph_mothname_v2(mothname):
     # If a moth was caught today the graph will be updated.
     # So find out if the graph is newer than the last database update,
     # if so we don't recreate
+    today = dt.date.today()
     try:
         file_update_time = dt.datetime.fromtimestamp(
             os.path.getmtime(f"{GRAPH_PATH}{mothname}.png")
@@ -543,12 +546,11 @@ def graph_mothname_v2(mothname):
         moth_logger.debug(f"File: {mothname}.png was updated: {file_update_time}")
         db_update_time = get_db_update_time()
         moth_logger.debug(f"Database:            was updated: {db_update_time}")
-        if file_update_time > db_update_time:
+        if file_update_time > db_update_time and file_update_time.year < today.year:
             return
     except (FileNotFoundError, TypeError):
         moth_logger.debug("File still not found")
 
-    today = dt.date.today()
     date_year_index = pd.DatetimeIndex(
         pd.date_range(
             start=today.replace(month=1, day=1), end=today.replace(month=12, day=31)
@@ -573,6 +575,8 @@ def graph_mothname_v2(mothname):
     fig = plt.figure(**plot_dict)
     ax = fig.add_subplot(111)
     ax.set_title(mothname)
+
+    moth_logger.debug(x)
     ax.plot(x, y_all, label="Average")
     ax.plot(x, y_this, "r", label=str(today.year))
     ax.legend()
@@ -608,17 +612,6 @@ def species():
                     FROM moth_records
                     GROUP BY Year, MothName
             ) yt GROUP BY MothName ORDER BY avg(Total) DESC;"""
-
-    # print(sql_config)
-    # cnx = mariadb.connect(**sql_config)
-    # cursor = cnx.cursor()
-
-    # cursor.execute(sql_string)
-    # data_list = [list(c) for c in cursor]
-    # sql_df = pd.DataFrame(data_list, columns=list(cursor.column_names))
-
-    # cursor.close()
-    # cnx.close()
 
     sql_df = get_table(sql_string)
 
@@ -721,6 +714,10 @@ def get_genus(genus=None):
     catches_df["Year"] = catches_df.Date.apply(lambda d: d.timetuple().tm_year)
     catches_df["Date"] = catches_df.Date.apply(lambda d: d.replace(year=this_year))
 
+    legend = ["Mean"]
+    if this_year in catches_df.Year:
+        legend += [str(this_year)]
+
     table_df = (
         catches_df.drop(["MothName", "MothGenus"], "columns")
         .set_index(["Year", "Date"])
@@ -730,11 +727,7 @@ def get_genus(genus=None):
     )
 
     table_df["Mean"] = table_df.mean(axis="columns")
-    ax = (
-        table_df.reindex(date_year_index)
-        .fillna(0)[["Mean", this_year]]
-        .plot(**plot_dict)
-    )
+    ax = table_df.reindex(date_year_index).fillna(0)[legend].plot(**plot_dict)
     ax.set_title(f"Genus:{genus}")
     ax.set_ylim(bottom=0)
     plt.savefig(f"{GRAPH_PATH}{genus}.png")
@@ -776,6 +769,10 @@ def get_family(family=None):
     catches_df["Year"] = catches_df.Date.apply(lambda d: d.timetuple().tm_year)
     catches_df["Date"] = catches_df.Date.apply(lambda d: d.replace(year=this_year))
 
+    legend = ["Mean"]
+    if this_year in catches_df.Year:
+        legend += [str(this_year)]
+
     table_df = (
         catches_df.drop(["MothName", "MothFamily"], "columns")
         .set_index(["Year", "Date"])
@@ -785,11 +782,7 @@ def get_family(family=None):
     )
 
     table_df["Mean"] = table_df.mean(axis="columns")
-    ax = (
-        table_df.reindex(date_year_index)
-        .fillna(0)[["Mean", this_year]]
-        .plot(**plot_dict)
-    )
+    ax = table_df.reindex(date_year_index).fillna(0)[legend].plot(**plot_dict)
     ax.set_title(f"Family:{family}")
     ax.set_ylim(bottom=0)
     plt.savefig(f"{GRAPH_PATH}{family}.png")
@@ -1099,13 +1092,22 @@ def survey_help():
     return output
 
 
+@app.hook("before_request")
+def before():
+    moth_logger.debug(f"{dt.datetime.now()} HOOK BEFORE")
+
+
+@app.hook("after_request")
+def after():
+    moth_logger.debug(f"{dt.datetime.now()} HOOK AFTER")
+
+
 if __name__ == "__main__":
     #    app = ProfilerMiddleware(app,
     #                             profile_dir = '/var/www/profile',
     #                             filename_format = "moths_bottle_{time}.prof")
 
-    app.catchall = False
-    bottle.run(
+    run(
         app=app,
         debug=True,
         reloader=True,
@@ -1113,5 +1115,3 @@ if __name__ == "__main__":
         port=cfg["PORT"],
         server="waitress",
     )
-
-# 20200329 10:07
