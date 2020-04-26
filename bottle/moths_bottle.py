@@ -10,6 +10,7 @@ appropriately and setting u+x permissions:
 
 History
 -------
+13 Apr 2020 - Trying to run in a waitress server
  9 Apr 2020 - Fixing Genus and family summaries where nothing caught in the current year.
  9 Apr 2020 - removed double import of bottle and added pre and post hooks as debug
  4 Apr 2020 - Change column width control to None from -1 due to deprication warning
@@ -572,6 +573,9 @@ def graph_mothname_v2(mothname):
     fig = plt.figure(**plot_dict)
     ax = fig.add_subplot(111)
     ax.set_title(mothname)
+
+
+    moth_logger.debug(x)
     ax.plot(x, y_all, label="Average")
     ax.plot(x, y_this, "r", label=str(today.year))
     ax.legend()
@@ -1040,7 +1044,5 @@ if __name__ == "__main__":
     #                             filename_format = "moths_bottle_{time}.prof")
 
 #    app.catchall = False
-    run(app=app, debug=True, reloader=True, host=cfg["HOST"], port=cfg["PORT"])
+    run(app=app, debug=True, reloader=True, host=cfg["HOST"], port=cfg["PORT"], server="waitress")
 
-#20200329 10:07
-    pass
