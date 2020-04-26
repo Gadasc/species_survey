@@ -1037,20 +1037,12 @@ def survey_handler():
     return show_latest()
 
 
-@app.route("/debug")
-@debug
-def debug_info():
-    """ Route showing some debug.
-    """
-    return [str(route.__dict__) + "</p>" for route in app.routes]
-
-
-@app.post("/form_get")
+@app.post("/handle_survey2")
 def echo_form():
-    # date_string = request.forms["dash_date_str"]
-    # fout_json = (
-    #    cfg["RECORDS_PATH"] + "day_count_" + date_string.replace("-", "") + ".json"
-    # )
+    date_string = request.forms["dash_date_str"]
+    fout_json = (
+        cfg["RECORDS_PATH"] + "day_count_" + date_string.replace("-", "") + ".json"
+    )
 
     rs = list()
     results_dict = dict()
@@ -1062,9 +1054,26 @@ def echo_form():
         )  # leave result as string
         if specimens:
             rs.append(f"<p><strong>{moth}</strong>      {specimens}</p>")
-            results_dict[moth] = str(specimens)
+            results_dict[moth] = str(specimens).replace(" ", "_")
 
-    return rs
+    # Store results locally  so when survey sheet is recalled it will auto populate
+    with open(fout_json, "w") as fout_js:
+        fout_js.write(json.dumps(results_dict))
+
+    # Get a connection to the databe
+    cnx = mariadb.connect(**sql_config)
+    cursor = cnx.cursor()
+    update_moth_database(cursor, date_string, results_dict)
+    cnx.close()
+    return show_latest()
+
+
+@app.route("/debug")
+@debug
+def debug_info():
+    """ Route showing some debug.
+    """
+    return [str(route.__dict__) + "</p>" for route in app.routes]
 
 
 @app.route("/help")

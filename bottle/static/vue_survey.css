@@ -40,10 +40,19 @@ body {
   background-color: transparent; 
 }
 
+.survey_date {
+  border: 1px solid transparent;
+  background-color: #f1f1f1;
+  padding: 0px;
+  word-wrap: break-word;
+  width: 20%; 
+  padding: 0px;
+  font: 36px Arial;
+}
 
 input {
   border: 1px solid transparent;
-  background-color: #f1f1f1;
+  background-color: inherit;
   padding: 0px;
   word-wrap: break-word;
   width: 100%; 
@@ -53,7 +62,7 @@ input {
 
 
 input[type=submit] {
-  background-color: DodgerBlue;
+  background-color:  #b9c9df;
   font: inherit;
   color: #fff;
 }
@@ -75,14 +84,14 @@ input[type=button] {
 .match_list_container {
   position: relative;
   display: inline-block;
-  background-color: #f70c0c;
+  background-color: #b9c9df;
   cursor: pointer;  
   width: 100%;  
 }
 .match_list_item {
   position: absolute;
   border: 1px solid #d4d4d4;
-  background-color: rgb(4, 227, 235);
+  background-color:  hsl(215, 37%, 90%);
   border-bottom: none;
   border-top: none;
   z-index: 99;

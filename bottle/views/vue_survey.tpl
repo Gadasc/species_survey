@@ -9,7 +9,7 @@
 </head>
 <body>
     % include("menu_moth.tpl")
-<h1>Test Vue Survey</h1>
+<h1>Moth Survey Sheet</h1>
 <div id="app"  />
 </body>
 
@@ -26,7 +26,7 @@
                    <td>\{\{moth_record.species\}\}</td>
                    <td class="recent">\{\{moth_record.recent\}\}</td>
                    <td><button class="round_button" v-on:click.prevent='decrement'>-</button></td>
-                   <td><input class="count" v-bind:name="moth_record.species" v-model="moth_record.count"></td>
+                   <td class="count"><input v-bind:name="moth_record.species" v-model="moth_record.count"></td>
                    <td><button class="round_button" v-on:click.prevent="increment">+</button></td>
                    </tr>
                    `,
@@ -62,7 +62,8 @@
     Vue.component('auto-list-box', {
         template: `
             <div class="match_list_container">
-            <input type="text" 
+            <input type="text"
+                autocomplete="off" 
                 placeholder="New moth" 
                 v-on:input="list_candidates()" 
                 v-on:keyup.down="process_down_event" 
@@ -144,8 +145,8 @@
         el: '#app',
         template: `    
         <div>
-        <form id="mothsForm" autocomplete="off" action="/form_get" method="post" v-on:keydown.enter.prevent>
-        Date: <input type="text" name="dash_date_str"  value="{{!dash_date_str}}" readonly></p>
+        <form id="mothsForm" autocomplete="off" action="/handle_survey2" method="post" v-on:keydown.enter.prevent>
+        Date: <input class="survey_date" type="text" name="dash_date_str"  value="{{!dash_date_str}}" readonly></p>
         <table>
         <thead><tr><th>Species</th><th>Recent</th><th></th><th>Count</th><th></th></tr></thead>
         <tbody>
