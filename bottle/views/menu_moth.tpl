@@ -2,7 +2,7 @@
 <ul>
 <li><a href="/">Home</a></li>
 <li><a href="/summary">Summary</a></li>
-<li><a href="/survey">Survey Sheet</a></li>
+<li><a href="/survey2">Survey Sheet</a></li>
 <li><a href="/latest">Latest Catches</a></li>
 <li><a href="/species">Species Summary</a></li>
 <li><a href="/genus">Genus Summary</a></li>
