@@ -1045,9 +1045,26 @@ def debug_info():
     return [str(route.__dict__) + "</p>" for route in app.routes]
 
 
-@app.route("/form_get")
+@app.post("/form_get")
 def echo_form():
-    return [str(request.query_string)]
+    # date_string = request.forms["dash_date_str"]
+    # fout_json = (
+    #    cfg["RECORDS_PATH"] + "day_count_" + date_string.replace("-", "") + ".json"
+    # )
+
+    rs = list()
+    results_dict = dict()
+    for moth in request.forms.keys():
+        if moth == "dash_date_str":
+            continue
+        specimens = request.forms.get(
+            moth, default=0, index=0, type=int
+        )  # leave result as string
+        if specimens:
+            rs.append(f"<p><strong>{moth}</strong>      {specimens}</p>")
+            results_dict[moth] = str(specimens)
+
+    return rs
 
 
 @app.route("/help")

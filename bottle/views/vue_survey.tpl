@@ -25,9 +25,9 @@
         template: `<tr>
                    <td>\{\{moth_record.species\}\}</td>
                    <td class="recent">\{\{moth_record.recent\}\}</td>
-                   <td><button class="round_button" v-on:click='decrement'>-</button></td>
+                   <td><button class="round_button" v-on:click.prevent='decrement'>-</button></td>
                    <td><input class="count" v-bind:name="moth_record.species" v-model="moth_record.count"></td>
-                   <td><button class="round_button" v-on:click="increment">+</button></td>
+                   <td><button class="round_button" v-on:click.prevent="increment">+</button></td>
                    </tr>
                    `,
         props: ['moth_record'],
@@ -46,7 +46,7 @@
     })
 
     Vue.component('match-item', {
-            template: `<div v-on:click="local_clicked_me">\{\{match_species\}\}</div>`,
+            template: `<div v-on:click.prevent="local_clicked_me">\{\{match_species\}\}</div>`,
             props: ['match_species'],
             methods: {
                 // Functions go here
@@ -144,7 +144,7 @@
         el: '#app',
         template: `    
         <div>
-        <form id="mothsForm" autocomplete="off" action="/form_get">
+        <form id="mothsForm" autocomplete="off" action="/form_get" method="post" v-on:keydown.enter.prevent>
         Date: <input type="text" name="dash_date_str"  value="{{!dash_date_str}}" readonly></p>
         <table>
         <thead><tr><th>Species</th><th>Recent</th><th></th><th>Count</th><th></th></tr></thead>
