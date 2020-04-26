@@ -10,6 +10,7 @@ appropriately and setting u+x permissions:
 
 History
 -------
+26 Apr 2020 - Replaced bare metal JS survey sheet with vue
 13 Apr 2020 - Trying to run in a waitress server
  9 Apr 2020 - Fixing Genus and family summaries where nothing caught in the current yr
  9 Apr 2020 - removed double import of bottle and added pre and post hooks as debug
@@ -812,30 +813,34 @@ def service_static_file(filename):
 @app.route("/survey/<dash_date_str:re:\\d{4}-\\d{2}-\\d{2}>")
 @debug
 def serve_survey(dash_date_str=None):
-    """ Generate a survey sheet to records today's results in. """
-    cnx = mariadb.connect(**sql_config)
-    db = cnx.cursor()
+    return [
+        "<h1>serve_survey has been deprecated - use "
+        '<a href="/survey2">/survey2</a>instead</h1>'
+    ]
+    # """ Generate a survey sheet to records today's results in. """
+    # cnx = mariadb.connect(**sql_config)
+    # db = cnx.cursor()
 
-    if dash_date_str:
-        generate_records_file(db, dash_date_str)
-        # TODO we may want to just remove the manifest to simplify the historical
-        # survey sheet.
-    else:
-        dash_date_str = dt.date.today().strftime("%Y-%m-%d")
-        refresh_manifest()  # The manifest shows the moths that could be caught
+    # if dash_date_str:
+    #     generate_records_file(db, dash_date_str)
+    #     # TODO we may want to just remove the manifest to simplify the historical
+    #     # survey sheet.
+    # else:
+    #     dash_date_str = dt.date.today().strftime("%Y-%m-%d")
+    #     refresh_manifest()  # The manifest shows the moths that could be caught
 
-    try:
-        date_str = dash_date_str.replace("-", "")
-        with open(f"{cfg['RECORDS_PATH']}day_count_{date_str}.json") as json_in:
-            records = json.load(json_in)
-    except FileNotFoundError:
-        records = {}
+    # try:
+    #     date_str = dash_date_str.replace("-", "")
+    #     with open(f"{cfg['RECORDS_PATH']}day_count_{date_str}.json") as json_in:
+    #         records = json.load(json_in)
+    # except FileNotFoundError:
+    #     records = {}
 
-    moth_logger.debug(f"Recent moths:{str(records)}")
-    db.close()
-    cnx.close()
+    # moth_logger.debug(f"Recent moths:{str(records)}")
+    # db.close()
+    # cnx.close()
 
-    return template("survey.tpl", records=records, dash_date_str=dash_date_str)
+    # return template("survey.tpl", records=records, dash_date_str=dash_date_str)
 
 
 @app.route("/survey2")
@@ -1016,37 +1021,8 @@ def survey_handler():
         )  # leave result as string
         if specimens:
             rs.append(f"<p><strong>{moth}</strong>      {specimens}</p>")
-            results_dict[moth] = str(specimens)
-
-    # Store results locally  so when survey sheet is recalled it will auto populate
-    with open(fout_json, "w") as fout_js:
-        fout_js.write(json.dumps(results_dict))
-
-    # Get a connection to the databe
-    cnx = mariadb.connect(**sql_config)
-    cursor = cnx.cursor()
-    update_moth_database(cursor, date_string, results_dict)
-    cnx.close()
-    return show_latest()
-
-
-@app.post("/handle_survey2")
-def echo_form():
-    date_string = request.forms["dash_date_str"]
-    fout_json = (
-        cfg["RECORDS_PATH"] + "day_count_" + date_string.replace("-", "") + ".json"
-    )
-
-    rs = list()
-    results_dict = dict()
-    for moth in request.forms.keys():
-        if moth == "dash_date_str":
-            continue
-        specimens = request.forms.get(
-            moth, default=0, index=0, type=int
-        )  # leave result as string
-        if specimens:
-            rs.append(f"<p><strong>{moth}</strong>      {specimens}</p>")
+            # replace spaces for backward compate
+            # TO DO - can we remove name mangling
             results_dict[moth] = str(specimens).replace(" ", "_")
 
     # Store results locally  so when survey sheet is recalled it will auto populate
@@ -1059,6 +1035,38 @@ def echo_form():
     update_moth_database(cursor, date_string, results_dict)
     cnx.close()
     return show_latest()
+
+
+# If no problems with /handle_survey then delete this
+# @app.post("/handle_survey2")
+# def echo_form():
+#     date_string = request.forms["dash_date_str"]
+#     fout_json = (
+#         cfg["RECORDS_PATH"] + "day_count_" + date_string.replace("-", "") + ".json"
+#     )
+
+#     rs = list()
+#     results_dict = dict()
+#     for moth in request.forms.keys():
+#         if moth == "dash_date_str":
+#             continue
+#         specimens = request.forms.get(
+#             moth, default=0, index=0, type=int
+#         )  # leave result as string
+#         if specimens:
+#             rs.append(f"<p><strong>{moth}</strong>      {specimens}</p>")
+#             results_dict[moth] = str(specimens).replace(" ", "_")
+
+#     # Store results locally  so when survey sheet is recalled it will auto populate
+#     with open(fout_json, "w") as fout_js:
+#         fout_js.write(json.dumps(results_dict))
+
+#     # Get a connection to the databe
+#     cnx = mariadb.connect(**sql_config)
+#     cursor = cnx.cursor()
+#     update_moth_database(cursor, date_string, results_dict)
+#     cnx.close()
+#     return show_latest()
 
 
 @app.route("/debug")

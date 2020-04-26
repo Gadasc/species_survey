@@ -145,7 +145,7 @@
         el: '#app',
         template: `    
         <div>
-        <form id="mothsForm" autocomplete="off" action="/handle_survey2" method="post" v-on:keydown.enter.prevent>
+        <form id="mothsForm" autocomplete="off" action="/handle_survey" method="post" v-on:keydown.enter.prevent>
         Date: <input class="survey_date" type="text" name="dash_date_str"  value="{{!dash_date_str}}" readonly></p>
         <table>
         <thead><tr><th>Species</th><th>Recent</th><th></th><th>Count</th><th></th></tr></thead>
