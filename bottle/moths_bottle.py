@@ -10,6 +10,7 @@ appropriately and setting u+x permissions:
 
 History
 -------
+27 Apr 2020 - Working on new index page to remove autocomplete js
 26 Apr 2020 - Replaced bare metal JS survey sheet with vue
 13 Apr 2020 - Trying to run in a waitress server
  9 Apr 2020 - Fixing Genus and family summaries where nothing caught in the current yr
@@ -47,6 +48,7 @@ import pandas as pd
 import mysql.connector as mariadb
 from sql_config import sql_config
 import datetime as dt
+import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.dates import MonthLocator, DateFormatter
 import numpy as np
@@ -58,6 +60,8 @@ from functools import wraps
 import os
 import json
 import html
+
+matplotlib.use("Agg")
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 TEMPLATE_PATH.insert(0, os.getcwd())
@@ -703,6 +707,9 @@ def get_genus(genus=None):
     )
 
     catches_df = get_table(sql_string)
+    if catches_df.empty:
+        return template("no_records.tpl")
+
     today = dt.date.today()
     this_year = today.year
     date_year_index = pd.DatetimeIndex(
@@ -758,6 +765,9 @@ def get_family(family=None):
     )
 
     catches_df = get_table(sql_string)
+    if catches_df.empty:
+        return template("no_records.tpl")
+
     today = dt.date.today()
     this_year = today.year
     date_year_index = pd.DatetimeIndex(
@@ -799,7 +809,7 @@ def get_family(family=None):
 def index():
     """ Landing page for the web site. """
     # Display a landing page
-    return template("index.tpl")
+    return template("index2.tpl")
 
 
 @app.route("/static/<filename>")
@@ -976,7 +986,8 @@ def get_species(species):
         return template(
             "species.tpl", species=species, catches=table_text, taxonomy=taxo_str
         )
-
+    elif len(unique_species) == 0:
+        return template("no_records.tpl")
     else:
         # There are multiple species - so provide the choice
         return " ".join(
