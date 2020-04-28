@@ -65,12 +65,13 @@
             <input type="text"
                 autocomplete="off" 
                 placeholder="New moth" 
-                v-on:input="list_candidates()" 
+                v-on:input="list_candidates" 
                 v-on:keyup.down="process_down_event" 
                 v-on:keyup.up="process_up_event"
                 v-on:keyup.enter="select_species(matched_names[highlighted_species])"
                 v-on:keyup.esc="select_species('')"
-                v-model=search_text />
+    
+                />
             <div class="match_list_item">
             <match-item  
                 v-for="match in matched_names" 
@@ -98,7 +99,8 @@
             match_filter: function(mname) {
                 return mname.toLowerCase().includes(this.lower_search_text) && !this.current_moths.includes(mname.toLowerCase());
             },
-            list_candidates: function(){
+            list_candidates: function(event){
+                this.search_text = event.target.value;
                 console.log("Search changed: " + this.search_text);
                 this.highlighted_species = null;
                 if (this.search_text.length > 2) {
