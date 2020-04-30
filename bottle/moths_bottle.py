@@ -639,8 +639,8 @@ def get_genus_list():
     SELECT MothGenus Genus, ceil(avg(Count)) `Annual Average` FROM
     (
         SELECT year(Date) Year,  MothGenus,  sum(MothCount) Count
-            FROM moth_records INNER JOIN taxonomy
-                ON moth_records.MothName = taxonomy.MothName
+            FROM moth_records INNER JOIN moth_taxonomy
+                ON moth_records.MothName = moth_taxonomy.MothName
             GROUP BY Year, MothGenus
     ) gc
     GROUP BY Genus ORDER BY `Annual Average` DESC;"""
@@ -666,8 +666,8 @@ def get_family_list():
     SELECT MothFamily Family, ceil(avg(Count)) `Annual Average` FROM
     (
         SELECT year(Date) Year,  MothFamily,  sum(MothCount) Count
-            FROM moth_records INNER JOIN taxonomy
-                ON moth_records.MothName = taxonomy.MothName
+            FROM moth_records INNER JOIN moth_taxonomy
+                ON moth_records.MothName = moth_taxonomy.MothName
             GROUP BY Year, MothFamily
     ) gc
     GROUP BY Family ORDER BY `Annual Average` DESC;"""
@@ -700,8 +700,8 @@ def get_genus(genus=None):
     sql_string = (
         """
             SELECT Date, moth_records.MothName, MothGenus, sum(MothCount) MothCount
-            FROM moth_records INNER JOIN taxonomy
-                ON moth_records.MothName = taxonomy.MothName
+            FROM moth_records INNER JOIN moth_taxonomy
+                ON moth_records.MothName = moth_taxonomy.MothName
             WHERE MothGenus LIKE """
         + f'"{genus}" GROUP BY Date;'
     )
@@ -758,8 +758,8 @@ def get_family(family=None):
     sql_string = (
         """
         SELECT Date, moth_records.MothName, MothFamily, sum(MothCount) MothCount
-        FROM moth_records INNER JOIN taxonomy
-            ON moth_records.MothName = taxonomy.MothName
+        FROM moth_records INNER JOIN moth_taxonomy
+            ON moth_records.MothName = moth_taxonomy.MothName
         WHERE MothFamily LIKE """
         + f'"{family}" GROUP BY Date;'
     )
@@ -963,9 +963,9 @@ def get_species(species):
     if len(unique_species) == 1:
         species = unique_species[0]
 
-        t = get_table(f'SELECT * from taxonomy WHERE MothName like "{species}";').iloc[
-            0
-        ]
+        t = get_table(
+            f'SELECT * from moth_taxonomy WHERE MothName like "{species}";'
+        ).iloc[0]
         taxo_str = (
             f'<ul style="list-style-type: none;">'
             f'<li><a href="/family/{t.MothFamily}">{t.MothFamily}</a></li>'
