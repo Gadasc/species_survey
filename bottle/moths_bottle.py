@@ -937,6 +937,19 @@ def get_summary():
     )
 
 
+@app.route("/update_mothnames")
+def update_mothnames():
+    """ Updates /static/common_names.js
+    """
+    names = get_table(f"SELECT MothName from moth_taxonomy;")
+
+    with open("./static/common_names.js", "w") as fnames:
+        fnames.write("var common_names = [")
+        for n in names.MothName:
+            fnames.write('"' + n + '", ')
+        fnames.write("];")
+
+
 @app.route("/species/<species>")
 @debug
 def get_species(species):
