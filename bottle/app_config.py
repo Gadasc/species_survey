@@ -3,6 +3,7 @@
 File containing a directory  of configuration information for the application
 """
 import socket
+import os
 
 app_config = dict()
 app_config["HOST"] = socket.gethostname()
@@ -17,3 +18,11 @@ app_config["BY_MONTH_GRAPH"] = "by_month_graph"
 app_config["LOG_PATH"] = "./log/"
 app_config["LOG_FILE"] = "moth_bottle.log"
 app_config["REQUESTS_LOG_FILE"] = "requests.log"
+
+# Test paths exist and create them if missing
+for k, v in app_config.items():
+    if "PATH" in k:
+        try:
+            os.mkdir(v)
+        except FileExistsError:
+            pass

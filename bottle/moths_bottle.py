@@ -1,4 +1,4 @@
-#! /usr/local/bin/python3
+#! /usr/bin/python3
 
 """
 moth_bottle.py
@@ -10,6 +10,7 @@ appropriately and setting u+x permissions:
 
 History
 -------
+ 3 May 2020 - Fixed some cases where no data caused a problem
 27 Apr 2020 - Working on new index page to remove autocomplete js
 26 Apr 2020 - Replaced bare metal JS survey sheet with vue
 13 Apr 2020 - Trying to run in a waitress server
@@ -42,7 +43,6 @@ History
 
 """
 
-from app_config import app_config as cfg
 from bottle import Bottle, template, static_file, TEMPLATE_PATH, request, response, run
 import pandas as pd
 import mysql.connector as mariadb
@@ -65,6 +65,7 @@ matplotlib.use("Agg")
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 TEMPLATE_PATH.insert(0, os.getcwd())
+from app_config import app_config as cfg
 
 # Override the pandas' max display width to prevent to_html truncating cols
 pd.set_option("display.max_colwidth", None)
@@ -369,6 +370,7 @@ def get_moth_grid(db):
         moth_grid_ccs - string with <style> for moth_grid_container - to set columns
         moth_grid_cells - concatinated lsit of <div> containers to be inserted <grid>
      """
+    cols = 5
 
     sql_species_name_by_month_year = """
         SELECT tw.Year, tw.Month, tw.MothName
@@ -393,16 +395,18 @@ def get_moth_grid(db):
     }
 
     species_df["V"] = 1
-    df = species_df.unstack("Year").loc[dt.date.today().month]["V"]
+    if species_df.empty:
+        cells = []
+    else:
+        df = species_df.unstack("Year").loc[dt.date.today().month]["V"]
 
-    cols = 5
-    rows = len(df.index) // cols + 1 if len(df.index) % cols else len(df.index) // cols
+        rows = len(df.index) // cols + 1 if len(df.index) % cols else len(df.index) // cols
 
-    cells = [
-        f'<div class="{state[(df.loc[mn][:-1].any(), df.loc[mn][-1:].any())]} '
-        f"{'shaded' if (((i//rows)+1)+((i%rows)+1))%2 else 'unshaded'}\">{mn}</div>"
-        for i, mn in enumerate(df.index)
-    ]
+        cells = [
+            f'<div class="{state[(df.loc[mn][:-1].any(), df.loc[mn][-1:].any())]} '
+            f"{'shaded' if (((i//rows)+1)+((i%rows)+1))%2 else 'unshaded'}\">{mn}</div>"
+            for i, mn in enumerate(df.index)
+        ]
 
     if len(cells) % cols:
         cells.extend([""] * (cols - (len(cells) % cols)))
@@ -427,6 +431,7 @@ def generate_monthly_species(cursor):
     """ Called from
         /summary route
         get_summary() """
+    this_year = dt.date.today().year
 
     moth_logger.debug(f"Creating by monthly chart")
     sql_species_name_by_month_year = """
@@ -444,14 +449,22 @@ def generate_monthly_species(cursor):
     pre_species_df = pd.DataFrame(data_list, columns=list(cursor.column_names))
     pre_species_df["V"] = 1
     moth_logger.debug(pre_species_df)
-    species_df = pre_species_df.set_index(["Month", "Year", "MothName"]).unstack(
-        ["Year", "MothName"]
-    )["V"]
+
+    # If the data is empty create a dummy entry
+    if pre_species_df.empty:
+        species_df = pd.DataFrame(
+            {"Month": [1],  "Year": [this_year], "MothName": ["Ano"], "V": 0}
+        ).set_index(
+            ["Month", "Year", "MothName"]
+        ).unstack(["Year", "MothName"])["V"]
+    else:
+        species_df = pre_species_df.set_index(["Month", "Year", "MothName"]).unstack(
+            ["Year", "MothName"]
+        )["V"]
 
     x_labels = [dt.date(2019, mn, 1).strftime("%b") for mn in range(1, 13)]
 
     # Create chart
-    this_year = dt.date.today().year
     fig = plt.figure(**plot_dict)
     ax = fig.add_subplot(111)
 
@@ -490,13 +503,23 @@ def generate_cummulative_species_graph(cursor):
         lambda dd: dd.replace(year=today.year)
     )
     cum_species.set_index(["Year", "Date", "MothName"], inplace=True)
-    cum_results = (
-        cum_species.unstack("Date")
-        .fillna(method="ffill", axis=1)
-        .groupby(by="Year")
-        .count()
-        .Catch.astype(float)
-    )  # Needs to be float for mask to work
+    print("DEBUG")
+    print(cum_species)
+    try:
+        cum_results = (
+            cum_species.unstack("Date")
+            .fillna(method="ffill", axis=1)
+            .groupby(by="Year")
+            .count()
+            .Catch.astype(float)
+        )  # Needs to be float for mask to work
+    except:
+       # If dataframe is empty...
+        cum_results = pd.DataFrame(
+            [0.0],
+            index=pd.Index([today.year], name="Year"),
+            columns=[str(today)]
+        )
 
     # Mask future dates to avoid plotting a horizontal line to eoy
     cum_results.loc[today.year].mask(
@@ -821,40 +844,6 @@ def service_static_file(filename):
 
 @app.route("/survey")
 @app.route("/survey/<dash_date_str:re:\\d{4}-\\d{2}-\\d{2}>")
-@debug
-def serve_survey(dash_date_str=None):
-    return [
-        "<h1>serve_survey has been deprecated - use "
-        '<a href="/survey2">/survey2</a>instead</h1>'
-    ]
-    # """ Generate a survey sheet to records today's results in. """
-    # cnx = mariadb.connect(**sql_config)
-    # db = cnx.cursor()
-
-    # if dash_date_str:
-    #     generate_records_file(db, dash_date_str)
-    #     # TODO we may want to just remove the manifest to simplify the historical
-    #     # survey sheet.
-    # else:
-    #     dash_date_str = dt.date.today().strftime("%Y-%m-%d")
-    #     refresh_manifest()  # The manifest shows the moths that could be caught
-
-    # try:
-    #     date_str = dash_date_str.replace("-", "")
-    #     with open(f"{cfg['RECORDS_PATH']}day_count_{date_str}.json") as json_in:
-    #         records = json.load(json_in)
-    # except FileNotFoundError:
-    #     records = {}
-
-    # moth_logger.debug(f"Recent moths:{str(records)}")
-    # db.close()
-    # cnx.close()
-
-    # return template("survey.tpl", records=records, dash_date_str=dash_date_str)
-
-
-@app.route("/survey2")
-@app.route("/survey2/<dash_date_str:re:\\d{4}-\\d{2}-\\d{2}>")
 @debug
 def serve_survey2(dash_date_str=None):
     """ Generate a survey sheet to records today's results in. """

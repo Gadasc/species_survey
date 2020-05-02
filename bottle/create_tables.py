@@ -18,8 +18,12 @@ try:
         "DEFAULT NULL, MothCount INT default 0);"
     )
     cursor.execute("describe moth_records;")
+    for x in cursor:
+        print(x)
 except Exception as e:
     print(e)
+
+
 
 
 names_df = pd.read_csv(
@@ -30,7 +34,7 @@ names_df = pd.read_csv(
 names_df.sort_values("Common", inplace=True)
 
 # Create and populate moth_taxonomy
-cursor.execute("DROP TABLE IF EXISTS moth_taxonomy")
+cursor.execute("DROP TABLE IF EXISTS moth_taxonomy;")
 cursor.execute(
     "CREATE TABLE moth_taxonomy (Id INT AUTO_INCREMENT PRIMARY KEY,"
     "MothName VARCHAR(50),"
