@@ -1,0 +1,3 @@
+# ignore everything in this directory, but allow git to create the directory on checkout
+*
+!.gitignore
