@@ -10,6 +10,7 @@ appropriately and setting u+x permissions:
 
 History
 -------
+ 4 May 2020 - Adding default and local configs for app and sql
  3 May 2020 - Fixed some cases where no data caused a problem
 27 Apr 2020 - Working on new index page to remove autocomplete js
 26 Apr 2020 - Replaced bare metal JS survey sheet with vue
@@ -46,7 +47,11 @@ History
 from bottle import Bottle, template, static_file, TEMPLATE_PATH, request, response, run
 import pandas as pd
 import mysql.connector as mariadb
-from sql_config import sql_config
+
+try:
+    from sql_config_local import sql_config
+except ModuleNotFoundError:
+    from sql_config_default import sql_config
 import datetime as dt
 import matplotlib
 import matplotlib.pyplot as plt
@@ -65,7 +70,10 @@ matplotlib.use("Agg")
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 TEMPLATE_PATH.insert(0, os.getcwd())
-from app_config import app_config as cfg
+try:
+    from app_config_local import app_config as cfg
+except ModuleNotFoundError:
+    from app_config_default import app_config as cfg
 
 # Override the pandas' max display width to prevent to_html truncating cols
 pd.set_option("display.max_colwidth", None)
@@ -400,7 +408,8 @@ def get_moth_grid(db):
     else:
         df = species_df.unstack("Year").loc[dt.date.today().month]["V"]
 
-        rows = len(df.index) // cols + 1 if len(df.index) % cols else len(df.index) // cols
+        li = len(df.index)
+        rows = li // cols + 1 if li % cols else li // cols
 
         cells = [
             f'<div class="{state[(df.loc[mn][:-1].any(), df.loc[mn][-1:].any())]} '
@@ -452,11 +461,13 @@ def generate_monthly_species(cursor):
 
     # If the data is empty create a dummy entry
     if pre_species_df.empty:
-        species_df = pd.DataFrame(
-            {"Month": [1],  "Year": [this_year], "MothName": ["Ano"], "V": 0}
-        ).set_index(
-            ["Month", "Year", "MothName"]
-        ).unstack(["Year", "MothName"])["V"]
+        species_df = (
+            pd.DataFrame(
+                {"Month": [1], "Year": [this_year], "MothName": ["Ano"], "V": 0}
+            )
+            .set_index(["Month", "Year", "MothName"])
+            .unstack(["Year", "MothName"])["V"]
+        )
     else:
         species_df = pre_species_df.set_index(["Month", "Year", "MothName"]).unstack(
             ["Year", "MothName"]
@@ -505,7 +516,12 @@ def generate_cummulative_species_graph(cursor):
     cum_species.set_index(["Year", "Date", "MothName"], inplace=True)
     print("DEBUG")
     print(cum_species)
-    try:
+    if cum_species.empty:
+        # If dataframe is empty...
+        cum_results = pd.DataFrame(
+            [0.0], index=pd.Index([today.year], name="Year"), columns=[str(today)]
+        )
+    else:
         cum_results = (
             cum_species.unstack("Date")
             .fillna(method="ffill", axis=1)
@@ -513,13 +529,6 @@ def generate_cummulative_species_graph(cursor):
             .count()
             .Catch.astype(float)
         )  # Needs to be float for mask to work
-    except:
-       # If dataframe is empty...
-        cum_results = pd.DataFrame(
-            [0.0],
-            index=pd.Index([today.year], name="Year"),
-            columns=[str(today)]
-        )
 
     # Mask future dates to avoid plotting a horizontal line to eoy
     cum_results.loc[today.year].mask(
