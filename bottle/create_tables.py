@@ -1,8 +1,10 @@
 import mysql.connector
 import pandas as pd
 
-from sql_config import sql_config
-
+try:
+    from sql_config_local import sql_config
+except ModuleNotFoundError:
+    from sql_config_default import sql_config
 moth_names = "./20200429_moth_names_all.csv"
 
 cnx = mysql.connector.connect(**sql_config)
@@ -22,8 +24,6 @@ try:
         print(x)
 except Exception as e:
     print(e)
-
-
 
 
 names_df = pd.read_csv(
