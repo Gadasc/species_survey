@@ -15,7 +15,7 @@ History
 27 Apr 2020 - Working on new index page to remove autocomplete js
 26 Apr 2020 - Replaced bare metal JS survey sheet with vue
 13 Apr 2020 - Trying to run in a waitress server
- 9 Apr 2020 - Fixing Genus and family summaries where nothing caught in the current yr.
+ 9 Apr 2020 - Fixing Genus and family summaries where nothing caught in the current yr
  9 Apr 2020 - removed double import of bottle and added pre and post hooks as debug
  4 Apr 2020 - Change column width control to None from -1 due to deprication warning
 26 Mar 2020 - Adding timestamp to debug wrapper
@@ -368,7 +368,7 @@ def get_db_update_time(use_db: bool = False) -> dt.datetime:
         moth_logger.debug("Using last dir update time, ")
         # Find most recent datetime change to the directory and use this.
         update_time = _get_file_update_time(cfg["RECORDS_PATH"])
-        print(update_time)
+        moth_logger.debug(update_time)
 
     return update_time
 
