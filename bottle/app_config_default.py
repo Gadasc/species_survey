@@ -2,11 +2,10 @@
 
 File containing a directory  of configuration information for the application
 """
-import socket
 import os
 
 app_config = dict()
-app_config["HOST"] = socket.gethostname()
+app_config["HOST"] = "0.0.0.0"
 app_config["PORT"] = 8082
 app_config["GRAPH_PATH"] = "./graphs/"
 app_config["RECORDS_PATH"] = "./records/"

@@ -1,185 +1,172 @@
 <!DOCTYPE html>
-
 <html>
 <head>
-<meta http-equiv="cache-control" content="no-cache" />
-<title>Merrington House Moth Survey</title>
-<link rel="stylesheet" type="text/css" href="/static/autocomplete.css">
-<link rel="stylesheet" type="text/css" href="/static/mothmenu.css">
+    <script src="/static/vue.js"></script>
+    <script src="/static/common_names.js"></script>
+    <link rel="stylesheet" type="text/css" href="/static/vue_survey.css">
+    <link rel="stylesheet" type="text/css" href="/static/mothmenu.css">
 </head>
-
 <body>
-% include("menu_moth.tpl")
-<h1>Home - Moths Survey</h1>
+    % include("menu_moth.tpl")
+<h1>Moth Survey - Home</h1>
+
+<div id="app"></div>
 <div>
+<pre style="font-size: small;">{{intro}}</pre>
 </div>
-<hr>
-<p id="todays_date">
-<form id="mothsForm", autocomplete="off" action="/species" method="get">
-<table id="demo">
-<tr id="headers"><th>Species</th><th>Rcnt</th><th>Count</th></tr>
-<tr id="moth_search">
-<td>
-  <!--Make sure the form has the autocomplete function switched off:-->
-  <div class="autocomplete" >
-    <input id="myInput" type="text"  placeholder="New moth" onfocusout="validate_input()">
-  </div>
-</td>
-<td></td><td></td></tr>
-</table>
 
-<button type="submit" onclick="validate_input()">Submit</button>
-</form>
-
-<p id="debug"></p>
-<p id="debug2"></p>
-<p id="debug3"></p>
-
-<script src="/static/autocomplete.js"></script>
-<script src="/static/common_names.js"></script>
+</body>
 
 <script>
+    Vue.component('table-row', {
+        template: `
+            <tr><td>\{\{record.species\}\}</td></tr>
+            `,
+        props:['record']
+    })
 
-// This blanks the New moth input field when it losses focus.
-// Otherwise a stale name is left in this field
-function validate_input() {
-	console.log("validating input");
-	document.getElementById("myInput").value="";
-}
+    
+    Vue.component('match-item', {
+            template: `<div v-on:click.prevent="local_clicked_me">\{\{match_species\}\}</div>`,
+            props: ['match_species'],
+            methods: {
+                // Functions go here
+                local_clicked_me: function(){
+                    console.log("Local clicked me"+this.match_species);
+                    this.$emit("clicked_me", this.match_species);
+                }
+            }
 
-// Helper function to increment/decrement the count of a table row.
-function update(click_species, inc) {
-	var x = parseInt(document.getElementById(click_species).value) + inc;
-	x = x < 0 ? 0 : x;
-	console.log("Update: " + click_species + " " + x);
-	document.getElementById(click_species).value = x;
-}
+    })
 
-// Add a moth record to the input table
-function printMoths(moth_object, prepend) {
-	// The old apple devices don't support default values so we need this code.
-	if (prepend === undefined){
-		prepend = false;
-	}
-    var mangled_moth_name = moth_object.species.replace(/ /gi, "_");
 
-    if (js_records && mangled_moth_name in js_records) {
-	moth_object.count = js_records[mangled_moth_name];
-	}
-    var row = document.createElement("tr");
-    row.className = "tr_survey";
-    var cell1 = document.createElement("td");
-    var cell2 = document.createElement("td");
-    var cell3 = document.createElement("td");
+    Vue.component('auto-list-box', {
+        template: `
+            <div style="width: 50%;" class="match_list_container">
+            <input type="text"
+                autocomplete="off" 
+                placeholder="Search moth names" 
+                v-on:input="list_candidates" 
+                v-on:keyup.down="process_down_event" 
+                v-on:keyup.up="process_up_event"
+                v-on:keyup.enter="select_species(matched_names[highlighted_species])"
+                v-on:keyup.esc.prevent="clear_search" 
+                v-model="search_text"
+                />
+            <div class="match_list_item">
+            <match-item  
+                v-for="match in matched_names" 
+                v-bind:match_species=match 
+                v-bind:key=match 
+                v-on:clicked_me="select_species" 
+                v-bind:class='{"match_list_item-active": (match === matched_names[highlighted_species])}' />
+            </div>
+            </div>
+            `,
+        data: function() {
+            return {moth_names: common_names,
+                    search_text: "",
+                    matched_names: [],
+                    selected_species: "",
+                    highlighted_species: null}
+        },
+        props: ['current_moths'],
+        computed: {
+            lower_search_text: function(){
+                return this.search_text.toLowerCase();
+            }
+        },
+        methods: {
+            match_filter: function(mname) {
+                return mname.toLowerCase().includes(this.lower_search_text) && !this.current_moths.includes(mname.toLowerCase());
+            },
+            list_candidates: function(event){
+                console.log("Search changed(event): " + this.search_text);
+                console.log("Event value: " + event.target.value);
+                this.search_text = event.target.value;
 
-    var cell1_txt = document.createTextNode(moth_object.species);
-    cell1.className = "species";
-    cell1.appendChild(cell1_txt);
+                this.highlighted_species = null;
+                if (this.search_text.length > 2) {
+                    this.matched_names = this.moth_names.filter(this.match_filter);
+                } else {
+                    this.matched_names = [];
+                }
+                console.log(this.matched_names);
+            },
+            select_species: function(value) {
+                this.selected_species = value;
+                this.search_text = "";
+                first_match = this.matched_names.length ? this.matched_names[0] : null 
+                this.matched_names = [];
+                this.highlighted_species = null;
+                console.log("Selected species: " + this.selected_species);
+                // Only add the species if it is valid
+                if(value !== "" && typeof value !== 'undefined') {
+                    console.log("Return: " + this.selected_species + " as match for: " + this.search_text);
+                    this.$emit("add-species", this.selected_species);
+                } else if(typeof first_match !== 'undefined'){
+                    console.log("Return 1st entry: "+ first_match);
+                    this.$emit("add-species", first_match);
+                }
+            },
+            clear_search: function() {
+                this.search_text = "";
+                this.matched_names = [];
+                this.highlighted_species = null;
+            },
+            process_down_event: function(event){
+                console.log("auto-list-box DOWN: " + event.type );
+                if (this.highlighted_species != null){
+                    this.highlighted_species += 1;
+                    this.highlighted_species %= this.matched_names.length;
+                }else{
+                    this.highlighted_species = 0;
+                }
+            },
+            process_up_event: function(event){
+                console.log("auto-list-box UP: " + event.type );
+                if (this.highlighted_species != null){
+                    this.highlighted_species -= 1;
+                    this.highlighted_species += this.matched_names.length;
+                    this.highlighted_species %= this.matched_names.length;
+                }else{
+                    this.highlighted_species = this.matched_names.length-1;
+                }
+            }
+        }
+    })
 
-    var cell2_txt = document.createTextNode(moth_object.recent);
-    cell2.className = "recent";
-    cell2.appendChild(cell2_txt);
-
-    var cell3_form = document.createElement("div");
-    //cell3_form.className = "count";
-
-    var cell3_count = document.createElement("input");
-    cell3_count.setAttribute("type", "text");
-    cell3_count.className = "count";
-    cell3_count.value = moth_object.count;
-    cell3_count.id = mangled_moth_name;
-    cell3_count.setAttribute("name", cell3_count.id);
-
-    var cell3_input_add = document.createElement("input");
-    cell3_input_add.type="button";
-    cell3_input_add.value = "+";
-    cell3_input_add.onclick=function(){update(mangled_moth_name, 1);};
-    var cell3_input_sub = document.createElement("input");
-    cell3_input_sub.type="button";
-    cell3_input_sub.value = "-";
-    cell3_input_sub.onclick=function(){update(mangled_moth_name, -1);};
-
-    cell3_form.appendChild(cell3_input_sub);
-    cell3_form.appendChild(cell3_count);
-    cell3_form.appendChild(cell3_input_add);
-    cell3.appendChild(cell3_form);
-
-    row.appendChild(cell1);
-    row.appendChild(cell2);
-    row.appendChild(cell3);
-    if (prepend) {
-        demo_search.parentNode.insertBefore(row, demo_search.nextSibling);
-    }
-    else {
-        demo_para.appendChild(row);
-    }
-}
-
-// Called when we exit the New Moth drop down box.
-function add_new_moth(new_species){
-	console.log("Adding: "+ new_species);
-	var new_moth_object = {species: new_species, recent:0, count:0};
-	printMoths(new_moth_object, true);
-	document.getElementById("myInput").value="";
-}
-
-// Helper function for extracting the moth species from the object
-// This is required as older apple products don't support => operator
-function get_name(moth_obj){
-	var moth = moth_obj.species;
-	return moth;
-}
-
-// These helper functions appear to be required because old iPads/iPhones don't seem to cope
-// with the newer => operator for mapping/filtering 
-function unmangle_name(mangled_name){
-	return mangled_name.replace(/_/gi, " ");
-}
-
-// Helper function used in filtering out list for display
-// This is required as apple devices don't support => operator
-function new_moth_test(moth_name){
-	return !moths_list.includes(moth_name);
-}
-
-// Functiont to redirect to a graph page for species
-function graph_page(moth_species){
-    // Now initiate a submit of the form to get a graph
-    window.location.href = "/species/" + moth_species;
-}
-
-// Using dict/json passed from bottle appliaction
-%#//--var js_records = {{!records}}
-var js_records = {}
-
-// Populate the initial table
-var demo_para = document.getElementById('demo');
-var demo_hdrs = document.getElementById('headers')
-var demo_search = document.getElementById('moth_search');
-//recent_moths.reverse().forEach(printMoths);
-
-//Now add any remaining moths from the json file for today's haul
-//var moths_list = recent_moths.map(get_name);
-//console.log(moths_list);
-
-//console.log("Moths list:" + moths_list.join());
-//if (js_records) {
-//	var saved_list = Object.keys(js_records).map(unmangle_name);
-//	console.log("Saved list:" + saved_list);
-//	var difference = saved_list.filter(new_moth_test);
-//	console.log("New moths:" + difference);
-//	for (i = 0; i < difference.length; i++) {
-//		console.log(difference[i] + " " + js_records[difference[i]]);
-//		var add_moth = {species: difference[i], recent:0, count:js_records[difference[i]]};
-//		printMoths(add_moth, true);
-//	}
-//}
-
-autocomplete(document.getElementById("myInput"), common_names, graph_page);
-
+    vm = new Vue({
+        el: '#app',
+        template: `    
+        <div>
+        <auto-list-box v-on:add-species="select_species" v-bind:current_moths="current_moths"></auto-list-box>
+        </div>
+        `,
+       
+        data: function() {
+            return {
+                moths: [],
+                current_moths: []
+            }
+        },
+        //props: ["moths"],
+        methods: {
+            select_species: function(new_species){
+                // link to ./species/new_species
+                window.location.href = "./species/"+ new_species;
+            }
+        }
+        
+        
+        
+    })
 
 
 </script>
 
-</body>
-</html> 
+<style>
+    
+</style>
+
+</html>
