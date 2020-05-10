@@ -70,7 +70,7 @@
                 v-on:keyup.up="process_up_event"
                 v-on:keyup.enter="select_species(matched_names[highlighted_species])"
                 v-on:keyup.esc="select_species('')"
-    
+                v-model="search_text"    
                 />
             <div class="match_list_item">
             <match-item  

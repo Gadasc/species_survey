@@ -46,6 +46,7 @@
                 v-on:keyup.up="process_up_event"
                 v-on:keyup.enter="select_species(matched_names[highlighted_species])"
                 v-on:keyup.esc.prevent="clear_search" 
+                v-model="search_text"
                 />
             <div class="match_list_item">
             <match-item  
