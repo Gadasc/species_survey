@@ -1,15 +1,32 @@
 #! /usr/bin/python3.7
 
 """
-moth_bottle.py
+##Introduction
 
-Install by adding the following to crontab - replacing PATH
-appropriately and setting u+x permissions:
+This Species Survey Software provides a local server for recording and analysing the
+data of bio-survey.
 
-@reboot PATH/moth_bottle.py &
+_Key features_
+  * A survey sheet pre-populated with the most likely species to observe
+  * Quick addition of new species
+  * Rapid graphing analysis of species, genus and family
+  * Up-to-date summary for the year and month
+  * Quick and easy notification of new species identification
 
-History
--------
+_Upcoming features_
+  * Automatic software update
+  * Interface to iRecord
+  * Improved prediction for survey sheet species based on previous year data
+  * Personalisation - colours, fonts, sizes
+  * Photo upload and usage on species summary page
+  * Food plant information on species summary page
+
+_Science study aims_
+  * Temperature study
+  * Food plant correlation and prediction
+
+##History
+11 May 2020 - Tidying repos, code and adding this summary to home page
  4 May 2020 - Adding default and local configs for app and sql
  3 May 2020 - Fixed some cases where no data caused a problem
 27 Apr 2020 - Working on new index page to remove autocomplete js
@@ -841,7 +858,7 @@ def get_family(family=None):
 def index():
     """ Landing page for the web site. """
     # Display a landing page
-    return template("index2.tpl")
+    return template("index.tpl", intro=__doc__)
 
 
 @app.route("/static/<filename>")
@@ -1057,38 +1074,6 @@ def survey_handler():
     update_moth_database(cursor, date_string, results_dict)
     cnx.close()
     return show_latest()
-
-
-# If no problems with /handle_survey then delete this
-# @app.post("/handle_survey2")
-# def echo_form():
-#     date_string = request.forms["dash_date_str"]
-#     fout_json = (
-#         cfg["RECORDS_PATH"] + "day_count_" + date_string.replace("-", "") + ".json"
-#     )
-
-#     rs = list()
-#     results_dict = dict()
-#     for moth in request.forms.keys():
-#         if moth == "dash_date_str":
-#             continue
-#         specimens = request.forms.get(
-#             moth, default=0, index=0, type=int
-#         )  # leave result as string
-#         if specimens:
-#             rs.append(f"<p><strong>{moth}</strong>      {specimens}</p>")
-#             results_dict[moth] = str(specimens).replace(" ", "_")
-
-#     # Store results locally  so when survey sheet is recalled it will auto populate
-#     with open(fout_json, "w") as fout_js:
-#         fout_js.write(json.dumps(results_dict))
-
-#     # Get a connection to the databe
-#     cnx = mariadb.connect(**sql_config)
-#     cursor = cnx.cursor()
-#     update_moth_database(cursor, date_string, results_dict)
-#     cnx.close()
-#     return show_latest()
 
 
 @app.route("/debug")
