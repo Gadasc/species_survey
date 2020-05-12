@@ -1,19 +1,19 @@
 #! /usr/bin/python3.7
 
 """
-##Introduction
+## Introduction
 
 This Species Survey Software provides a local server for recording and analysing the
 data of bio-survey.
 
-_Key features_
+### Key features
   * A survey sheet pre-populated with the most likely species to observe
   * Quick addition of new species
   * Rapid graphing analysis of species, genus and family
   * Up-to-date summary for the year and month
   * Quick and easy notification of new species identification
 
-_Upcoming features_
+### Upcoming features
   * Automatic software update
   * Interface to iRecord
   * Improved prediction for survey sheet species based on previous year data
@@ -21,43 +21,43 @@ _Upcoming features_
   * Photo upload and usage on species summary page
   * Food plant information on species summary page
 
-_Science study aims_
+### Science study aims
   * Temperature study
   * Food plant correlation and prediction
 
-##History
-11 May 2020 - Tidying repos, code and adding this summary to home page
- 4 May 2020 - Adding default and local configs for app and sql
- 3 May 2020 - Fixed some cases where no data caused a problem
-27 Apr 2020 - Working on new index page to remove autocomplete js
-26 Apr 2020 - Replaced bare metal JS survey sheet with vue
-13 Apr 2020 - Trying to run in a waitress server
- 9 Apr 2020 - Fixing Genus and family summaries where nothing caught in the current yr
- 9 Apr 2020 - removed double import of bottle and added pre and post hooks as debug
- 4 Apr 2020 - Change column width control to None from -1 due to deprication warning
-26 Mar 2020 - Adding timestamp to debug wrapper
-13 Mar 2020 - Adding debug wrapper
-24 Nov 2019 - Adding summary pages for genus and family
-23 Nov 2019 - Adding /family pagesd
-21 Nov 2019 - Add /genus page (also good for aggregations)
-17 Nov 2019 - Add /species page to show most popular species
-10 Nov 2019 - On submit - redirect to /latest instead of creating a new page
- 8 Nov 2019 - Fixing bug where summary graph double counted
- 6 Nov 2019 - Filters out 'None' from manifest
- 3 Nov 2019 - Added Moth Bingo Grid to summary
-28 Sep 2019 - Adding Species by month graph
-17 Sep 2019 - Moving species to a view
-16 Sep 2019 - Adding logging
-15 Sep 2019 - Adding code to avoid updating summary graph unless needed.
-14 Sep 2019 - add summary page
-08 Sep 2019 - Now allows data to be modified by adding date YYYY-MM-DD to /survey/
-07 Sep 2019 - Fine tuning table to only remove singletons.
-18 Aug 2019 - moving back to RPi and generating manifest file on the fly.
-15 Aug 2019 - Combining functions to update database
-13 Aug 2019 - Adding route page and working out how to add javascript
-20 Jul 2019 - starting to optimise so graphs aren't redrawn unless required.
-16 Jul 2019 - Profiling using werkzeug
-13 Jul 2019 - Initial trial page producing a table and graph of catches.
+###History
+    11 May 2020 - Tidying repos, code and adding this summary to home page
+     4 May 2020 - Adding default and local configs for app and sql
+     3 May 2020 - Fixed some cases where no data caused a problem
+    27 Apr 2020 - Working on new index page to remove autocomplete js
+    26 Apr 2020 - Replaced bare metal JS survey sheet with vue
+    13 Apr 2020 - Trying to run in a waitress server
+     9 Apr 2020 - Fixing Genus and family summaries when nothing  in the current yr
+     9 Apr 2020 - removed double import of bottle and added pre and post hooks as debug
+     4 Apr 2020 - Change column width control to None from -1 due to deprication warning
+    26 Mar 2020 - Adding timestamp to debug wrapper
+    13 Mar 2020 - Adding debug wrapper
+    24 Nov 2019 - Adding summary pages for genus and family
+    23 Nov 2019 - Adding /family pagesd
+    21 Nov 2019 - Add /genus page (also good for aggregations)
+    17 Nov 2019 - Add /species page to show most popular species
+    10 Nov 2019 - On submit - redirect to /latest instead of creating a new page
+     8 Nov 2019 - Fixing bug where summary graph double counted
+     6 Nov 2019 - Filters out 'None' from manifest
+     3 Nov 2019 - Added Moth Bingo Grid to summary
+    28 Sep 2019 - Adding Species by month graph
+    17 Sep 2019 - Moving species to a view
+    16 Sep 2019 - Adding logging
+    15 Sep 2019 - Adding code to avoid updating summary graph unless needed.
+    14 Sep 2019 - add summary page
+    08 Sep 2019 - Now allows data to be modified by adding date YYYY-MM-DD to /survey/
+    07 Sep 2019 - Fine tuning table to only remove singletons.
+    18 Aug 2019 - moving back to RPi and generating manifest file on the fly.
+    15 Aug 2019 - Combining functions to update database
+    13 Aug 2019 - Adding route page and working out how to add javascript
+    20 Jul 2019 - starting to optimise so graphs aren't redrawn unless required.
+    16 Jul 2019 - Profiling using werkzeug
+    13 Jul 2019 - Initial trial page producing a table and graph of catches.
 
 """
 
@@ -77,6 +77,7 @@ import numpy as np
 import logging
 import logging.handlers
 from functools import wraps
+from markdown import markdown
 
 # from werkzeug.middleware.profiler import ProfilerMiddleware
 import os
@@ -858,7 +859,7 @@ def get_family(family=None):
 def index():
     """ Landing page for the web site. """
     # Display a landing page
-    return template("index.tpl", intro=__doc__)
+    return template("index.tpl", intro=markdown(__doc__))
 
 
 @app.route("/static/<filename>")

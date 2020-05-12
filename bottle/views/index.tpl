@@ -11,8 +11,8 @@
 <h1>Moth Survey - Home</h1>
 
 <div id="app"></div>
-<div>
-<pre style="font-size: small;">{{intro}}</pre>
+<div id=index_intro>
+{{!intro}}
 </div>
 
 </body>
