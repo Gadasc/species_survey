@@ -4,7 +4,6 @@
 <head>
 <meta http-equiv="cache-control" content="no-cache" />
 <title>Merrington House Moth Survey</title>
-<link rel="stylesheet" type="text/css" href="/static/autocomplete.css">
 <link rel="stylesheet" type="text/css" href="/static/mothmenu.css">
 </head>
 
