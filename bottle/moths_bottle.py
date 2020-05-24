@@ -26,6 +26,7 @@ data of bio-survey.
   * Food plant correlation and prediction
 
 ###History
+    12 May 2020 - Started development for iRecord entry
     11 May 2020 - Tidying repos, code and adding this summary to home page
      4 May 2020 - Adding default and local configs for app and sql
      3 May 2020 - Fixed some cases where no data caused a problem
@@ -141,17 +142,6 @@ def get_table(sql_query):
     return count_df
 
 
-def debug(fn):
-    @wraps(fn)
-    def debug_fn(*args, **kwds):
-        moth_logger.debug(f">>>: {dt.datetime.now()} :: {fn.__name__}")
-        retcode = fn(*args, **kwds)
-        moth_logger.debug(f"<<<: {dt.datetime.now()} :: {fn.__name__}")
-        return retcode
-
-    return debug_fn
-
-
 def log_to_logger(fn):
     """ Wrap a Bottle request so that a log line is emitted after it's handled.
     (This decorator can be extended to take the desired logger as a param.) """
@@ -262,7 +252,6 @@ def generate_records_file(cursor, date_dash_str):
         json_out.write(json.dumps(records_dict))
 
 
-@debug
 def show_latest_moths(cursor):
     """ Generate a table showing the latest records.
         Because we are using mysql.connector instead sqlalchemy which ORM we
@@ -497,15 +486,21 @@ def generate_monthly_species(cursor):
     fig = plt.figure(**plot_dict)
     ax = fig.add_subplot(111)
 
+    month_index = list(range(1, 13))
     ax.bar(
         x_labels,
-        species_df.any(axis="columns", level=1).sum(axis="columns").values,
+        species_df.any(axis="columns", level=1)
+        .sum(axis="columns")
+        .reindex(index=month_index, fill_value=0)
+        .values,
         color="#909090",
         label="All",
     )
     ax.bar(
         x_labels,
-        species_df[this_year].sum(axis="columns"),
+        species_df[this_year]
+        .sum(axis="columns")
+        .reindex(index=month_index, fill_value=0),
         width=0.5,
         color="b",
         label=this_year,
@@ -649,7 +644,6 @@ app.install(log_to_logger)  # Logs html requests to a file
 
 
 @app.route("/graphs/<species>")
-@debug
 def server_graphs(species):
     """ Helper route to return a graph image as a static file. """
     species = species.replace("%20", " ")
@@ -657,7 +651,6 @@ def server_graphs(species):
 
 
 @app.route("/species")
-@debug
 def species():
     """ Show  list of moths caught to date. """
     sql_string = """
@@ -738,7 +731,6 @@ def get_family_list():
 
 @app.route("/genus")
 @app.route("/genus/<genus>")
-@debug
 def get_genus(genus=None):
     """ Show the species in a given genus and graph the aggregation.
         If genus is None then present and ordered list of genus by
@@ -798,7 +790,6 @@ def get_genus(genus=None):
 
 @app.route("/family")
 @app.route("/family/<family>")
-@debug
 def get_family(family=None):
     """ Show the species in a given family and graph the aggregation. """
 
@@ -855,7 +846,6 @@ def get_family(family=None):
 
 
 @app.route("/")
-@debug
 def index():
     """ Landing page for the web site. """
     # Display a landing page
@@ -863,7 +853,6 @@ def index():
 
 
 @app.route("/static/<filename>")
-@debug
 def service_static_file(filename):
     """ Help route to return static files. """
     return static_file(f"{filename}", root=cfg["STATIC_PATH"])
@@ -871,7 +860,6 @@ def service_static_file(filename):
 
 @app.route("/survey")
 @app.route("/survey/<dash_date_str:re:\\d{4}-\\d{2}-\\d{2}>")
-@debug
 def serve_survey2(dash_date_str=None):
     """ Generate a survey sheet to records today's results in. """
     cnx = mariadb.connect(**sql_config)
@@ -907,7 +895,6 @@ def serve_survey2(dash_date_str=None):
 
 
 @app.route("/summary")
-@debug
 def get_summary():
     """ Display an overall summary for the Moths web-site. """
     create_graphs = False
@@ -967,7 +954,6 @@ def update_mothnames():
 
 
 @app.route("/species/<species>")
-@debug
 def get_species(species):
     """ Generate a summary page for the specified moth species.
         Use % as a wildcard.
@@ -1028,7 +1014,6 @@ def get_species(species):
 
 
 @app.route("/latest")
-@debug
 def show_latest():
     """ Shows the latest moth catches. """
     # Get a connection to the databe
@@ -1042,7 +1027,6 @@ def show_latest():
 
 
 @app.post("/handle_survey")
-@debug
 def survey_handler():
     """ Handler to manage the data returned from the survey sheet. """
     #    today_string = dt.datetime.now()
@@ -1078,15 +1062,58 @@ def survey_handler():
 
 
 @app.route("/debug")
-@debug
 def debug_info():
     """ Route showing some debug.
     """
     return [str(route.__dict__) + "</p>" for route in app.routes]
 
 
+@app.route("/download/<dl_year>")
+@app.route("/download/<dl_year>/<dl_month>")
+def export_data(dl_year, dl_month=None):
+    """ This function generate the csv to be exported in a format
+        compatible with iRecord https://www.brc.ac.uk/irecord/import-records
+    """
+    query_string = f"SELECT * FROM moth_records WHERE YEAR(Date)={dl_year}"
+    query_string += f" AND Month(Date)={dl_month};" if dl_month else ";"
+
+    moth_logger.debug(query_string)
+
+    export_data = get_table(query_string)
+
+    # Rework dataframe so it outputs clean data for iRecord
+    export_data.drop(columns=["Id"], inplace=True)
+    export_data.rename(
+        columns={
+            "MothName": "Species",
+            "MothCount": "Quantity",
+            "Lamp": "Sample Comment",
+        },
+        inplace=True,
+    )
+    export_data["GridRef"] = "SU5120569500"
+    export_data["Recorder Name"] = "Gareth Scourfield"
+
+    return template(export_data.loc[export_data["Quantity"] != 0].to_csv(index=False))
+
+
+@app.route("/export")
+def export_page():
+    """ Page for exporting moth records in a format compatible with iRecord
+        Columns: Species, Site Name, Site Name, Grid Ref, Date.
+    """
+
+    # Determine oldest record
+    earliest_record = get_table("SELECT MIN(Date) Earliest FROM moth_records;")[
+        "Earliest"
+    ][0]
+    moth_logger.debug(">>>>", earliest_record.year)
+    return template(
+        "export", e_year=earliest_record.year, e_month=earliest_record.month
+    )
+
+
 @app.route("/help")
-@debug
 def survey_help():
     """ Displays a list of links to possible pages """
     output = str()
@@ -1106,16 +1133,6 @@ def survey_help():
         moth_logger.debug(rte)
     output += "</ul>"
     return output
-
-
-@app.hook("before_request")
-def before():
-    moth_logger.debug(f"{dt.datetime.now()} HOOK BEFORE")
-
-
-@app.hook("after_request")
-def after():
-    moth_logger.debug(f"{dt.datetime.now()} HOOK AFTER")
 
 
 if __name__ == "__main__":
