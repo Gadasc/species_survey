@@ -519,7 +519,10 @@ def generate_cummulative_species_graph(cursor):
     today = dt.date.today()
 
     # Update species graph
-    cursor.execute("SELECT year(Date) Year, Date, MothName FROM moth_records;")
+    cursor.execute(
+        "SELECT year(Date) Year, Date, MothName "
+        "FROM moth_records WHERE MothName IS NOT NULL;"
+    )
     cum_species = pd.DataFrame(
         [list(c) for c in cursor], columns=list(cursor.column_names)
     )
