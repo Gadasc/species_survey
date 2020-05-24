@@ -7,6 +7,7 @@
 <li><a href="/species">Species Summary</a></li>
 <li><a href="/genus">Genus Summary</a></li>
 <li><a href="/family">Family Summary</a></li>
+<li><a href="/export">Export</a></li>
 <li><a href="/help">Help</a></li>
 </ul>
 </nav>
