@@ -26,6 +26,7 @@ data of bio-survey.
   * Food plant correlation and prediction
 
 ###History
+    24 May 2020 - Improved robustness of get_db_update_time
     24 May 2020 - Fixing monthly column chart for zero months
     12 May 2020 - Started development for iRecord entry
     11 May 2020 - Tidying repos, code and adding this summary to home page
@@ -94,6 +95,7 @@ try:
     from app_config_local import app_config as cfg
 except ModuleNotFoundError:
     from app_config_default import app_config as cfg
+cfg["DB_UPDATE_TIME_FILE"] = "db_update_time.flag"
 
 # Override the pandas' max display width to prevent to_html truncating cols
 pd.set_option("display.max_colwidth", None)
@@ -207,6 +209,12 @@ def refresh_manifest():
 def update_moth_database(cursor, sql_date_string, dict_records):
     """ Update the mysql server with the latest records
     """
+
+    # touch the records file so we know we have updated the database.
+    # This is a workaround as not all databases store when they were updated.
+    with open(cfg["RECORDS_PATH"] + cfg["DB_UPDATE_TIME_FILE"], "w"):
+        pass
+
     # delete any records for today
     cursor.execute("DELETE FROM moth_records WHERE Date = %s;", (sql_date_string,))
 
@@ -349,7 +357,13 @@ def graph_date_overlay():
 
 def _get_file_update_time(fname: str) -> dt.datetime:
     """ helper function to the updated time of a file """
-    return dt.datetime.fromtimestamp(os.path.getmtime(fname))
+    udt = None
+    try:
+        udt = dt.datetime.fromtimestamp(os.path.getmtime(fname))
+        moth_logger.debug(f"Using FILE:{fname} time as db update: {udt}")
+    except FileNotFoundError:
+        pass
+    return udt
 
 
 def get_db_update_time(use_db: bool = False) -> dt.datetime:
@@ -373,10 +387,23 @@ def get_db_update_time(use_db: bool = False) -> dt.datetime:
         cnx.close()
 
     if not update_time or not use_db:
-        moth_logger.debug("Using last dir update time, ")
+
+        # If we can't use the database to get the update time we must infer it.
+        # I'm using a simple file that gets written on a db update.
+        db_time_file = cfg["RECORDS_PATH"] + cfg["DB_UPDATE_TIME_FILE"]
+        moth_logger.debug(f"Using {db_time_file} to infer database update time, ")
         # Find most recent datetime change to the directory and use this.
-        update_time = _get_file_update_time(cfg["RECORDS_PATH"])
-        moth_logger.debug(update_time)
+        update_time = _get_file_update_time(
+            cfg["RECORDS_PATH"] + cfg["DB_UPDATE_TIME_FILE"]
+        )
+
+    if update_time is None:
+        update_time = dt.datetime.now()
+        moth_logger.debug(
+            f"Can't determine database update time so using NOW {update_time}!"
+        )
+
+    moth_logger.debug(f"Database update time = {update_time}")
 
     return update_time
 
@@ -912,17 +939,18 @@ def get_summary():
             f"{cfg['GRAPH_PATH']}{cfg['CUM_SPECIES_GRAPH']}.png"
         )
         create_graphs = db_update_time > summary_graph_time
-        moth_logger.debug(
-            f"DB updated {db_update_time} since last summary graph update "
-            f"{summary_graph_time}. \n"
-            f"Updating summary graph"
-        )
+
     except FileNotFoundError:
         create_graphs = True
 
     cnx = mariadb.connect(**sql_config)
     db = cnx.cursor()
     if create_graphs:
+        moth_logger.debug(
+            f"DB updated since last summary graph update "
+            f"{summary_graph_time}. \n"
+            f"Updating summary graph"
+        )
         generate_cummulative_species_graph(db)
 
         # Update catch diversity graph
@@ -1055,6 +1083,8 @@ def survey_handler():
 
     # Store results locally  so when survey sheet is recalled it will auto populate
     with open(fout_json, "w") as fout_js:
+        moth_logger.debug(f"Updating {fout_json} file")
+        moth_logger.debug(results_dict)
         fout_js.write(json.dumps(results_dict))
 
     # Get a connection to the databe
