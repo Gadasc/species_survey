@@ -26,6 +26,7 @@ data of bio-survey.
   * Food plant correlation and prediction
 
 ###History
+    24 May 2020 - Fixing monthly column chart for zero months
     12 May 2020 - Started development for iRecord entry
     11 May 2020 - Tidying repos, code and adding this summary to home page
      4 May 2020 - Adding default and local configs for app and sql
