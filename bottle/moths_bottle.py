@@ -26,6 +26,7 @@ data of bio-survey.
   * Food plant correlation and prediction
 
 ###History
+    24 May 2020 - Fixed summary graphs for low entry totals
     12 May 2020 - Started development for iRecord entry
     11 May 2020 - Tidying repos, code and adding this summary to home page
      4 May 2020 - Adding default and local configs for app and sql
@@ -518,7 +519,10 @@ def generate_cummulative_species_graph(cursor):
     today = dt.date.today()
 
     # Update species graph
-    cursor.execute("SELECT year(Date) Year, Date, MothName FROM moth_records;")
+    cursor.execute(
+        "SELECT year(Date) Year, Date, MothName "
+        "FROM moth_records WHERE MothName IS NOT NULL;"
+    )
     cum_species = pd.DataFrame(
         [list(c) for c in cursor], columns=list(cursor.column_names)
     )
