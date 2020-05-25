@@ -26,6 +26,7 @@ data of bio-survey.
   * Food plant correlation and prediction
 
 ###History
+    24 May 2020 - Tidied Recent catches a little
     24 May 2020 - Improved robustness of get_db_update_time
     24 May 2020 - Fixing monthly column chart for zero months
     12 May 2020 - Started development for iRecord entry
@@ -277,15 +278,21 @@ def show_latest_moths(cursor):
     records_dict = {row: line for row, line in enumerate(cursor)}
 
     recent_df = pd.DataFrame.from_dict(records_dict, columns=columns, orient="index")
-    recent_df["MothName"] = recent_df["MothName"].apply(
+    print(recent_df)
+    recent_df["Species"] = recent_df["MothName"].apply(
         lambda mn: f'<a href="/species/{mn}">{mn}</a>'
     )
     recent_df["Date"] = recent_df["Date"].apply(
         lambda dd: f'<a href="/survey/{dd}">{dd}</a>'
     )
-    recent_df.set_index(["Date", "MothName"], inplace=True)
+    recent_df.set_index(["Date", "Species"], inplace=True)
 
-    return recent_df.unstack("Date").fillna("").to_html(escape=False, justify="left")
+    return (
+        recent_df["MothCount"]
+        .unstack("Date")
+        .fillna("")
+        .to_html(escape=False, justify="left")
+    )
 
 
 # ToDo: Refactor using get_table
