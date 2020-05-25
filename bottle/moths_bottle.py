@@ -26,6 +26,7 @@ data of bio-survey.
   * Food plant correlation and prediction
 
 ###History
+    25 May 2020 - Tidied data entry screen to provide date na
     24 May 2020 - Tidied Recent catches a little
     24 May 2020 - Improved robustness of get_db_update_time
     24 May 2020 - Fixing monthly column chart for zero months
@@ -1099,7 +1100,14 @@ def survey_handler():
     cursor = cnx.cursor()
     update_moth_database(cursor, date_string, results_dict)
     cnx.close()
-    return show_latest()
+
+    # If the date string is today-return recent catches page,
+    # otherwise show data entry for the next day
+    page_date = dt.datetime.strptime(date_string, "%Y-%m-%d")
+    if page_date.date() == dt.date.today():
+        return show_latest()
+    else:
+        return serve_survey2((page_date + dt.timedelta(days=1)).strftime("%Y-%m-%d"))
 
 
 @app.route("/debug")

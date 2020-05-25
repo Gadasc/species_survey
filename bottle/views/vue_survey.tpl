@@ -13,6 +13,8 @@
 <div id="app"  />
 </body>
 
+
+
 <script>
     Vue.component('table-row', {
         template: `
@@ -148,7 +150,9 @@
         template: `    
         <div>
         <form id="mothsForm" autocomplete="off" action="/handle_survey" method="post" v-on:keydown.enter.prevent>
-        Date: <input class="survey_date" type="text" name="dash_date_str"  value="{{!dash_date_str}}" readonly></p>
+        Date: <a class=daynav v-bind:href=yesterday>&#9664;</a>
+              <input class="survey_date" type="text" name="dash_date_str"  value="{{!dash_date_str}}" readonly>
+              <a class=daynav v-bind:href=tomorrow>&#9654;</a></p>
         <table>
         <thead><tr><th>Species</th><th>Recent</th><th></th><th>Count</th><th></th></tr></thead>
         <tbody>
@@ -164,16 +168,26 @@
        
         data: function() {
             return {
-                //manifest_moths: [], 
-                //captured_moths: [],
                 moths: []
             }
         },
-        //props: ["moths"],
         methods: {
             add_species: function(new_species){
                 console.log(new_species);
                 this.moths.unshift({"species": new_species, "recent": 0, "count": 0});
+            },
+            formatDate: function(date) {
+                var d = new Date(date),
+                    month = '' + (d.getMonth() + 1),
+                    day = '' + d.getDate(),
+                    year = d.getFullYear();
+
+                if (month.length < 2) 
+                    month = '0' + month;
+                if (day.length < 2) 
+                    day = '0' + day;
+
+                return [year, month, day].join('-');
             }
         },
         computed: {
@@ -182,6 +196,20 @@
             current_moths: function(){
                 return this.moths.map(function(item){return item.species.toLowerCase();});
             },
+            yesterday: function(){
+                tdy = new Date("{{!dash_date_str}}");
+                tdy.setHours(12);
+                ms = tdy.getTime();
+                ms-= 24*60*60*1000;
+                return "/survey/"+this.formatDate(ms);
+            },
+            tomorrow: function(){
+                tdy = new Date("{{!dash_date_str}}");
+                tdy.setHours(12)
+                ms = tdy.getTime();
+                ms += 24*60*60*1000;
+                return "/survey/"+this.formatDate(ms);
+            }
         }
         
         
@@ -218,8 +246,5 @@
 
 </script>
 
-<style>
-    
-</style>
-
 </html>
+
