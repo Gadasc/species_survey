@@ -17,6 +17,8 @@ app_config["BY_MONTH_GRAPH"] = "by_month_graph"
 app_config["LOG_PATH"] = "./log/"
 app_config["LOG_FILE"] = "moth_bottle.log"
 app_config["REQUESTS_LOG_FILE"] = "requests.log"
+app_config["TAXONOMY_TABLE"] = "irecord_taxonomy"
+app_config["DB_UPDATE_TIME_FILE"] = "db_update_time.flag"
 
 # Test paths exist and create them if missing
 for k, v in app_config.items():

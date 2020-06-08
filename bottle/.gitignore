@@ -1,6 +1,8 @@
 !.gitignore
 sql_config_local.py
 app_config_local.py
+last_irecord_table_update.log
+
 *.db
 *.swp
 *.yaml

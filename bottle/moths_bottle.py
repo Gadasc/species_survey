@@ -12,10 +12,11 @@ data of bio-survey.
   * Rapid graphing analysis of species, genus and family
   * Up-to-date summary for the year and month
   * Quick and easy notification of new species identification
+  * Automatic software update
+  * Export of month/year data in format ready for upload to iRecord
 
 ### Upcoming features
-  * Automatic software update
-  * Interface to iRecord
+  * Improved Interface to iRecord
   * Improved prediction for survey sheet species based on previous year data
   * Personalisation - colours, fonts, sizes
   * Photo upload and usage on species summary page
@@ -26,6 +27,8 @@ data of bio-survey.
   * Food plant correlation and prediction
 
 ###History
+     8 Jun 2020 - Converted to an updatable, iRecord compatible taxonomy database
+     6 Jun 2020 - Moving taxo table to irecord taxonomy and adding update ability
     25 May 2020 - Tidied data entry screen to provide date na
     24 May 2020 - Tidied Recent catches a little
     24 May 2020 - Improved robustness of get_db_update_time
@@ -88,6 +91,7 @@ from markdown import markdown
 import os
 import json
 import html
+import update_moth_taxonomy
 
 matplotlib.use("Agg")
 
@@ -97,7 +101,7 @@ try:
     from app_config_local import app_config as cfg
 except ModuleNotFoundError:
     from app_config_default import app_config as cfg
-cfg["DB_UPDATE_TIME_FILE"] = "db_update_time.flag"
+
 
 # Override the pandas' max display width to prevent to_html truncating cols
 pd.set_option("display.max_colwidth", None)
@@ -568,6 +572,7 @@ def generate_cummulative_species_graph(cursor):
     cum_species.set_index(["Year", "Date", "MothName"], inplace=True)
     print("DEBUG")
     print(cum_species)
+    cum_species.to_csv("CumSpeciesDebug.csv")
     if cum_species.empty:
         # If dataframe is empty...
         cum_results = pd.DataFrame(
@@ -717,12 +722,12 @@ def species():
 def get_genus_list():
     """ Show list of moths caught to date. """
 
-    sql_string = """
+    sql_string = f"""
     SELECT MothGenus Genus, ceil(avg(Count)) `Annual Average` FROM
     (
         SELECT year(Date) Year,  MothGenus,  sum(MothCount) Count
-            FROM moth_records INNER JOIN moth_taxonomy
-                ON moth_records.MothName = moth_taxonomy.MothName
+            FROM moth_records INNER JOIN {cfg["TAXONOMY_TABLE"]}
+                ON moth_records.MothName = {cfg["TAXONOMY_TABLE"]}.MothName
             GROUP BY Year, MothGenus
     ) gc
     GROUP BY Genus ORDER BY `Annual Average` DESC;"""
@@ -744,12 +749,12 @@ def get_genus_list():
 def get_family_list():
     """ Show list of moths caught to date. """
 
-    sql_string = """
+    sql_string = f"""
     SELECT MothFamily Family, ceil(avg(Count)) `Annual Average` FROM
     (
         SELECT year(Date) Year,  MothFamily,  sum(MothCount) Count
-            FROM moth_records INNER JOIN moth_taxonomy
-                ON moth_records.MothName = moth_taxonomy.MothName
+            FROM moth_records INNER JOIN {cfg["TAXONOMY_TABLE"]}
+                ON moth_records.MothName = {cfg["TAXONOMY_TABLE"]}.MothName
             GROUP BY Year, MothFamily
     ) gc
     GROUP BY Family ORDER BY `Annual Average` DESC;"""
@@ -779,10 +784,10 @@ def get_genus(genus=None):
         return get_genus_list()
 
     sql_string = (
-        """
+        f"""
             SELECT Date, moth_records.MothName, MothGenus, sum(MothCount) MothCount
-            FROM moth_records INNER JOIN moth_taxonomy
-                ON moth_records.MothName = moth_taxonomy.MothName
+            FROM moth_records INNER JOIN {cfg["TAXONOMY_TABLE"]}
+                ON moth_records.MothName = {cfg["TAXONOMY_TABLE"]}.MothName
             WHERE MothGenus LIKE """
         + f'"{genus}" GROUP BY Date;'
     )
@@ -836,10 +841,10 @@ def get_family(family=None):
         return get_family_list()
 
     sql_string = (
-        """
+        f"""
         SELECT Date, moth_records.MothName, MothFamily, sum(MothCount) MothCount
-        FROM moth_records INNER JOIN moth_taxonomy
-            ON moth_records.MothName = moth_taxonomy.MothName
+        FROM moth_records INNER JOIN {cfg["TAXONOMY_TABLE"]}
+            ON moth_records.MothName = {cfg["TAXONOMY_TABLE"]}.MothName
         WHERE MothFamily LIKE """
         + f'"{family}" GROUP BY Date;'
     )
@@ -982,15 +987,19 @@ def get_summary():
 
 @app.route("/update_mothnames")
 def update_mothnames():
-    """ Updates /static/common_names.js
-    """
-    names = get_table(f"SELECT MothName from moth_taxonomy;")
+    update_moth_taxonomy.update_mothnames()
 
-    with open("./static/common_names.js", "w") as fnames:
-        fnames.write("var common_names = [")
-        for n in names.MothName:
-            fnames.write('"' + n + '", ')
-        fnames.write("];")
+
+# def update_mothnames():
+#    """ Updates /static/common_names.js
+#    """
+#    names = get_table(f"SELECT MothName from {cfg['TAXONOMY_TABLE']};")
+#
+#    with open("./static/common_names.js", "w") as fnames:
+#        fnames.write("var common_names = [")
+#        for n in names.MothName:
+#            fnames.write('"' + n + '", ')
+#        fnames.write("];")
 
 
 @app.route("/species/<species>")
@@ -1019,7 +1028,8 @@ def get_species(species):
         species = unique_species[0]
 
         t = get_table(
-            f'SELECT * from moth_taxonomy WHERE MothName like "{species}";'
+            f"""SELECT * from {cfg["TAXONOMY_TABLE"]}
+                WHERE MothName like "{species}";"""
         ).iloc[0]
         taxo_str = (
             f'<ul style="list-style-type: none;">'
@@ -1189,6 +1199,10 @@ if __name__ == "__main__":
     #                             profile_dir = '/var/www/profile',
     #                             filename_format = "moths_bottle_{time}.prof")
 
+    # Check whether database needs an update
+    update_moth_taxonomy.update_table_moth_taxonomy()
+
+    # Run server
     run(
         app=app,
         debug=True,
