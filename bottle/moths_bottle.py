@@ -91,17 +91,15 @@ from markdown import markdown
 import os
 import json
 import html
-import update_moth_taxonomy
 
-matplotlib.use("Agg")
-
-os.chdir(os.path.dirname(os.path.abspath(__file__)))
-TEMPLATE_PATH.insert(0, os.getcwd())
 try:
     from app_config_local import app_config as cfg
 except ModuleNotFoundError:
     from app_config_default import app_config as cfg
+import update_moth_taxonomy
 
+matplotlib.use("Agg")
+TEMPLATE_PATH.insert(0, os.getcwd())  # sets the cwd for the bottle templates to work
 
 # Override the pandas' max display width to prevent to_html truncating cols
 pd.set_option("display.max_colwidth", None)
