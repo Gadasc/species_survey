@@ -20,6 +20,13 @@ app_config["REQUESTS_LOG_FILE"] = "requests.log"
 app_config["TAXONOMY_TABLE"] = "irecord_taxonomy"
 app_config["DB_UPDATE_TIME_FILE"] = "db_update_time.flag"
 
+
+# Test paths exist and create them if missing
+try:
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
+except FileNotFoundError:
+    pass  # Hack - this is the second time this has been called.
+
 # Test paths exist and create them if missing
 for k, v in app_config.items():
     if "PATH" in k:

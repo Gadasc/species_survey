@@ -14,7 +14,10 @@ import os
 import datetime as dt
 import glob
 
-os.chdir(os.path.dirname(os.path.abspath(__file__)))
+# Can't call this twice without messing things up.
+# TODO: get rid of the global variables and
+# pass a reference to sql_config and app_config
+# os.chdir(os.path.dirname(os.path.abspath(__file__)))
 try:
     from sql_config_local import sql_config
 except ModuleNotFoundError:
