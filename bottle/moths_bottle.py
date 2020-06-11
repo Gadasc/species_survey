@@ -27,6 +27,8 @@ data of bio-survey.
   * Food plant correlation and prediction
 
 ###History
+    10 Jun 2020 - Started work on aggregating taxon and common names for graphs
+    10 Jun 2020 - Changed upload to use Scientific names.
      8 Jun 2020 - Converted to an updatable, iRecord compatible taxonomy database
      6 Jun 2020 - Moving taxo table to irecord taxonomy and adding update ability
     25 May 2020 - Tidied data entry screen to provide date na
@@ -299,25 +301,25 @@ def show_latest_moths(cursor):
 
 
 # ToDo: Refactor using get_table
-def get_moth_catches(moth_name: str):
-    query_str = (
-        f"select Date, MothCount from moth_records "
-        f'where MothName like "{moth_name}" group by Date;'
-    )
+# def get_moth_catches(moth_name: str):
+#     query_str = (
+#         f"select Date, MothCount from moth_records "
+#         f'where MothName like "{moth_name}" group by Date;'
+#     )
 
-    # Establish a connection to the SQL server
-    cnx = mariadb.connect(**sql_config)
-    cursor = cnx.cursor()
-    cursor.execute(query_str)
-    columns = list(cursor.column_names)
-    # debug(columns)
+#     # Establish a connection to the SQL server
+#     cnx = mariadb.connect(**sql_config)
+#     cursor = cnx.cursor()
+#     cursor.execute(query_str)
+#     columns = list(cursor.column_names)
+#     # debug(columns)
 
-    data_list = [list(c) for c in cursor]
-    survey_df = pd.DataFrame(data_list, columns=columns)
-    cursor.close()
-    cnx.close()
+#     data_list = [list(c) for c in cursor]
+#     survey_df = pd.DataFrame(data_list, columns=columns)
+#     cursor.close()
+#     cnx.close()
 
-    return survey_df
+#     return survey_df
 
 
 # ToDo: Refactor using get_table
@@ -604,7 +606,18 @@ def generate_cummulative_species_graph(cursor):
 
 
 def graph_mothname_v2(mothname):
-    catches_df = get_moth_catches(mothname)
+
+    # catches_df = get_moth_catches(mothname)
+    query_str = f"""SELECT mr.Date, mr.MothCount
+        FROM (select * from {cfg['TAXONOMY_TABLE']} where MothName = "{mothname}") sp
+        JOIN {cfg['TAXONOMY_TABLE']} re
+        ON sp.TVK = re.TVK
+        JOIN moth_records mr
+        ON mr.MothName = re.MothName
+        GROUP BY mr.Date;"""
+    catches_df = get_table(query_str)
+    print(query_str)
+    print(catches_df)
 
     # Test results
     moth_logger.debug(f"Latest date: {catches_df.Date.max()}")
@@ -988,42 +1001,37 @@ def update_mothnames():
     update_moth_taxonomy.update_mothnames()
 
 
-# def update_mothnames():
-#    """ Updates /static/common_names.js
-#    """
-#    names = get_table(f"SELECT MothName from {cfg['TAXONOMY_TABLE']};")
-#
-#    with open("./static/common_names.js", "w") as fnames:
-#        fnames.write("var common_names = [")
-#        for n in names.MothName:
-#            fnames.write('"' + n + '", ')
-#        fnames.write("];")
-
-
 @app.route("/species/<species>")
 def get_species(species):
     """ Generate a summary page for the specified moth species.
-        Use % as a wildcard.
-    """
+        Use % as a wildcard."""
     # Establish a connection to the SQL server
-    cnx = mariadb.connect(**sql_config)
-    db = cnx.cursor()
+    # cnx = mariadb.connect(**sql_config)
+    # db = cnx.cursor()
+
+    # query_str = f'SELECT * from moth_records where MothName LIKE "{species}";'
     species = species.replace("%20", " ")
-
-    query_str = f'SELECT * from moth_records where MothName LIKE "{species}";'
-    db.execute(query_str)
-    columns = list(db.column_names)
-    data_list = [list(c) for c in db]
-    db.close()
-    cnx.close()
-
-    all_survey_df = pd.DataFrame(data_list, columns=columns)
+    query_str = f"""SELECT mr.Date, re.MothName, mr.MothCount, re.TVK
+        FROM (select * from {cfg['TAXONOMY_TABLE']} where MothName = "{species}") sp
+        JOIN {cfg['TAXONOMY_TABLE']} re
+            ON sp.TVK = re.TVK
+        JOIN moth_records mr
+            ON mr.MothName = re.MothName;"""
+    all_survey_df = get_table(query_str)
+    print(query_str)
+    print(all_survey_df)
+    # db.execute(query_str)
+    # columns = list(db.column_names)
+    # data_list = [list(c) for c in db]
+    # db.close()
+    # cnx.close()
+    # all_survey_df = pd.DataFrame(data_list, columns=columns)
 
     # If a wildcard query was resolved to a unique species then replace species with the
     # the unique species
-    unique_species = all_survey_df["MothName"].unique()
+    unique_species = all_survey_df["TVK"].unique()
     if len(unique_species) == 1:
-        species = unique_species[0]
+        # species = unique_species[0]
 
         t = get_table(
             f"""SELECT * from {cfg["TAXONOMY_TABLE"]}
@@ -1131,23 +1139,18 @@ def export_data(dl_year, dl_month=None):
     """ This function generate the csv to be exported in a format
         compatible with iRecord https://www.brc.ac.uk/irecord/import-records
     """
-    query_string = f"SELECT * FROM moth_records WHERE YEAR(Date)={dl_year}"
-    query_string += f" AND Month(Date)={dl_month};" if dl_month else ";"
+
+    month_option = f" AND Month(Date)={dl_month}" if dl_month else ""
+    query_string = f"""SELECT mr.Date, CONCAT(mt.MothGenus, " ", mt.MothSpecies) Species,
+        mr.MothCount Quantity,
+        CONCAT("Lamp used: ",mr.Lamp, "\nCommon Name: ", mt.MothName) Comment
+        FROM (select * FROM moth_records WHERE Year(Date)=2020 {month_option}) mr
+        JOIN moth_taxonomy mt ON mr.MothName=mt.MothName;"""
 
     moth_logger.debug(query_string)
-
     export_data = get_table(query_string)
 
-    # Rework dataframe so it outputs clean data for iRecord
-    export_data.drop(columns=["Id"], inplace=True)
-    export_data.rename(
-        columns={
-            "MothName": "Species",
-            "MothCount": "Quantity",
-            "Lamp": "Sample Comment",
-        },
-        inplace=True,
-    )
+    # Add data for iRecord
     export_data["GridRef"] = "SU5120569500"
     export_data["Recorder Name"] = "Gareth Scourfield"
 
