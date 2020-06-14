@@ -27,6 +27,7 @@ data of bio-survey.
   * Food plant correlation and prediction
 
 ###History
+    14 Jun 2020 - First pass of species aggregation
     10 Jun 2020 - Started work on aggregating taxon and common names for graphs
     10 Jun 2020 - Changed upload to use Scientific names.
      8 Jun 2020 - Converted to an updatable, iRecord compatible taxonomy database
@@ -690,13 +691,12 @@ def species_():
 def get_used_names(map_tvk2mn, tvk):
     """ Helper function - that returns the common and scientfic names based on
         a map for a specific TVK"""
-    tvk_entries = map_tvk2mn.loc[tvk]  # Udea olivalis
+    t = tvk_entries = map_tvk2mn.loc[tvk]  # Udea olivalis
 
     scientific_name = ""
     common_name = None
     if isinstance(tvk_entries, pd.Series):
         # Only one name is used
-        t = tvk_entries
         if t.MothName == t.MothGenus + " " + t.MothSpecies:
             common_name = ""
             scientific_name = t.MothName
@@ -708,7 +708,7 @@ def get_used_names(map_tvk2mn, tvk):
         common_name = ", ".join(
             [
                 n.MothName
-                for n in t.itertuples()
+                for n in tvk_entries.itertuples()
                 if n.MothName != n.MothGenus + " " + n.MothSpecies
             ]
         )
