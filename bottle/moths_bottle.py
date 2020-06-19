@@ -27,7 +27,12 @@ data of bio-survey.
   * Food plant correlation and prediction
 
 ###History
-    17 Jun 2020 - Working on improvements for data entry
+    19 Jun 2020 - Data entry improvements
+        - Search list is now punctuation agnostic e.g. White-speck == White speck
+        - Duplicates removed from list - fixing a bug that causes list to stick
+        - Reduced species persistance in survey sheet to 7 days
+        - Allow new species to persist across subsequent days on data entry
+        - Combined Common Name and Scientific name on species summary page
     14 Jun 2020 - First pass of species aggregation
     10 Jun 2020 - Started work on aggregating taxon and common names for graphs
     10 Jun 2020 - Changed upload to use Scientific names.
@@ -255,31 +260,31 @@ def show_latest_moths(cursor):
         need to query the database with an SQL string and build the recent
         sightings table."""
 
-    columns = ["Date", "MothName", "MothCount"]
-    # mothname_col = columns.index("MothName")
+    # columns = ["Date", "MothName", "MothCount"]
+    # # mothname_col = columns.index("MothName")
 
-    cursor.execute(
-        f"SELECT {', '.join(columns)} FROM moth_records WHERE "
-        "Date > DATE_ADD(NOW(), INTERVAL -14 DAY);"
-    )
-    records_dict = {row: line for row, line in enumerate(cursor)}
+    # cursor.execute(
+    #     f"SELECT {', '.join(columns)} FROM moth_records WHERE "
+    #     "Date > DATE_ADD(NOW(), INTERVAL -14 DAY);"
+    # )
+    # records_dict = {row: line for row, line in enumerate(cursor)}
 
-    recent_df = pd.DataFrame.from_dict(records_dict, columns=columns, orient="index")
-    print(recent_df)
-    recent_df["Species"] = recent_df["MothName"].apply(
-        lambda mn: f'<a href="/species/{mn}">{mn}</a>'
-    )
-    recent_df["Date"] = recent_df["Date"].apply(
-        lambda dd: f'<a href="/survey/{dd}">{dd}</a>'
-    )
-    recent_df.set_index(["Date", "Species"], inplace=True)
+    # recent_df = pd.DataFrame.from_dict(records_dict, columns=columns, orient="index")
+    # print(recent_df)
+    # recent_df["Species"] = recent_df["MothName"].apply(
+    #     lambda mn: f'<a href="/species/{mn}">{mn}</a>'
+    # )
+    # recent_df["Date"] = recent_df["Date"].apply(
+    #     lambda dd: f'<a href="/survey/{dd}">{dd}</a>'
+    # )
+    # recent_df.set_index(["Date", "Species"], inplace=True)
 
-    return (
-        recent_df["MothCount"]
-        .unstack("Date")
-        .fillna("")
-        .to_html(escape=False, justify="left")
-    )
+    # return (
+    #     recent_df["MothCount"]
+    #     .unstack("Date")
+    #     .fillna("")
+    #     .to_html(escape=False, justify="left")
+    # )
 
 
 def graph_date_overlay():
@@ -522,13 +527,27 @@ def generate_cummulative_species_graph(cursor):
             [0.0], index=pd.Index([today.year], name="Year"), columns=[str(today)]
         )
     else:
-        cum_results = (
-            cum_species.unstack("Date")
-            .fillna(method="ffill", axis=1)
-            .groupby(by="Year")
-            .count()
-            .Catch.astype(float)
-        )  # Needs to be float for mask to work
+        try:
+            # The initial groupby is intended to remove duplicate indexes
+            cum_results = (
+                cum_species.groupby(["Year", "Date", "MothName"])
+                .sum()
+                .unstack("Date")
+                .fillna(method="ffill", axis=1)
+                .groupby(by="Year")
+                .count()
+                .Catch.astype(float)
+            )  # Needs to be float for mask to work
+        except ValueError:
+            # You've probably updated the taxonomy database and this has caused two
+            # entries on the same date to merge. This needs fixing/checking
+            dups_df = cum_species.groupby(["Year", "Date", "MothName"]).sum()
+            moth_logger.error(
+                "Finding a duplicate species - probably due to updated "
+                "taxonomy database merging species:"
+            )
+            moth_logger.error(dups_df.loc[dups_df.Catch > 1])
+            raise
 
     # Mask future dates to avoid plotting a horizontal line to eoy
     cum_results.loc[today.year].mask(
@@ -1078,12 +1097,42 @@ def get_species(species):
 def show_latest():
     """ Shows the latest moth catches. """
     # Get a connection to the databe
-    cnx = mariadb.connect(**sql_config)
+    # cnx = mariadb.connect(**sql_config)
 
-    cursor = cnx.cursor()
-    latest_table = show_latest_moths(cursor)
-    cnx.close()
+    # cursor = cnx.cursor()
+    # latest_table = show_latest_moths(cursor)
+    # cnx.close()
 
+    # columns = ["Date", "MothName", "MothCount"]
+    # # mothname_col = columns.index("MothName")
+
+    # cursor.execute(
+    #     f"SELECT {', '.join(columns)} FROM moth_records WHERE "
+    #     "Date > DATE_ADD(NOW(), INTERVAL -14 DAY);"
+    # )
+    # records_dict = {row: line for row, line in enumerate(cursor)}
+
+    # recent_df = pd.DataFrame.from_dict(records_dict, columns=columns, orient="index")
+
+    recent_df = get_table(
+        """SELECT Date, MothName, MothCount FROM moth_records WHERE
+        Date > DATE_ADD(NOW(), INTERVAL -14 DAY) AND MothName != "NULL";"""
+    )
+    print(recent_df)
+    recent_df["Species"] = recent_df["MothName"].apply(
+        lambda mn: f'<a href="/species/{mn}">{mn}</a>'
+    )
+    recent_df["Date"] = recent_df["Date"].apply(
+        lambda dd: f'<a href="/survey/{dd}">{dd}</a>'
+    )
+    recent_df.set_index(["Date", "Species"], inplace=True)
+
+    latest_table = (
+        recent_df["MothCount"]
+        .unstack("Date")
+        .fillna("")
+        .to_html(escape=False, justify="left")
+    )
     return template("latest.tpl", html_table=latest_table)
 
 

@@ -94,12 +94,12 @@
         props: ['current_moths'],
         computed: {
             lower_search_text: function(){
-                return this.search_text.toLowerCase();
+                return this.search_text.toLowerCase().replace(/[^a-z]/g, " ");
             }
         },
         methods: {
             match_filter: function(mname) {
-                return mname.toLowerCase().includes(this.lower_search_text) && !this.current_moths.includes(mname.toLowerCase());
+                return mname.toLowerCase().replace(/[^a-z]/g, " ").includes(this.lower_search_text) && !this.current_moths.includes(mname.toLowerCase());
             },
             list_candidates: function(event){
                 this.search_text = event.target.value;
