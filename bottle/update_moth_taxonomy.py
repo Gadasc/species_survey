@@ -111,17 +111,20 @@ def update_table(tablename, filename):
         msi = list(names_df.columns).index("MothSpecies")
         mni = list(names_df.columns).index("MothName")
         print(mgi, msi)
+        # Avoid duplicating scientific name entries
+        taxons_added = set()
         for _, *row in names_df.itertuples():
             cursor.execute(
                 f"INSERT INTO {tablename} ({cols}) VALUES ({subs});", tuple(row)
             )
             taxon = f"{row[mgi]} {row[msi]}"
-            if row[mni] != taxon:
+            if row[mni] != taxon and taxon not in taxons_added:
                 # print((taxon, *row[1:]))
                 cursor.execute(
                     f"INSERT INTO {tablename} ({cols}) VALUES ({subs});",
                     (taxon, *row[1:]),
                 )
+                taxons_added.add(taxon)
 
     except ModuleNotFoundError:
         rv = False

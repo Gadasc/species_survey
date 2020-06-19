@@ -27,6 +27,12 @@ data of bio-survey.
   * Food plant correlation and prediction
 
 ###History
+    19 Jun 2020 - Data entry improvements
+        - Search list is now punctuation agnostic e.g. White-speck == White speck
+        - Duplicates removed from list - fixing a bug that causes list to stick
+        - Reduced species persistance in survey sheet to 7 days
+        - Allow new species to persist across subsequent days on data entry
+        - Combined Common Name and Scientific name on species summary page
     14 Jun 2020 - First pass of species aggregation
     10 Jun 2020 - Started work on aggregating taxon and common names for graphs
     10 Jun 2020 - Changed upload to use Scientific names.
@@ -176,36 +182,18 @@ def log_to_logger(fn):
     return _log_to_logger
 
 
-def refresh_manifest():
-    """ Check the javascript manifest.js file is up to date """
-    today = dt.date.today()
-    try:
-        if (
-            dt.date.fromtimestamp(
-                os.path.getmtime(cfg["STATIC_PATH"] + cfg["MANIFEST_FILE"])
-            )
-            == today
-        ):
-            moth_logger.debug("Today's manifest exists - returning.")
-            return
-    except FileNotFoundError:
-        pass
+def refresh_manifest(dash_date_str):
+    """ Check the javascript manifest.js file is up to date.
+        dash_date_str is in the form YYYY-MM-DD"""
 
-    # By getting here we have to update the manifest file.
-    # Get moths and quantity found in the last 2 weeks
-    cnx = mariadb.connect(**sql_config)
-    cursor = cnx.cursor()
-    cursor.execute(
-        f"SELECT MothName species, sum(MothCount) recent FROM moth_records WHERE "
-        "Date > DATE_ADD(NOW(), INTERVAL -14 DAY) GROUP BY species;"
+    recent_df = get_table(
+        f"""SELECT MothName species, sum(MothCount) recent
+        FROM moth_records WHERE
+        Date > DATE_ADD(DATE("{dash_date_str}"), INTERVAL -7 DAY) AND
+        Date <= DATE("{dash_date_str}") GROUP BY species;"""
     )
 
-    records_dict = {row: line for row, line in enumerate(cursor) if None not in line}
-    recent_df = pd.DataFrame.from_dict(
-        records_dict, columns=["species", "recent"], orient="index"
-    )
-
-    # generate javascript file to be sent to broswers
+    # generate javascript file to be sent to browsers
     with open(cfg["STATIC_PATH"] + cfg["MANIFEST_FILE"], "w") as mout:
         mout.write("var recent_moths  = [\n")
         for _, r in recent_df.iterrows():
@@ -249,23 +237,21 @@ def generate_records_file(cursor, date_dash_str):
     """ Ensure the records file cfg['RECORD_PATH'] exists
         This file contains the {moth(with underscords): count:str} dict in json form
     """
-    columns = ["MothName", "MothCount"]
-    cursor.execute(
-        f"SELECT {','.join(columns)} FROM moth_records where Date='{date_dash_str}';"
+    #   columns = []
+    records_df = get_table(
+        f"""SELECT MothName, MothCount FROM moth_records
+            WHERE Date='{date_dash_str}' AND MothName != 'NULL';"""
     )
-    records_dict = {}
-    for mn, mc in cursor:
-        if mn is None:
-            continue  # The latest table shows when no moths were caught
-
-        moth_logger.debug(f"{mn}: {str(mc)}")
-        records_dict[mn.replace(" ", "_")] = str(mc)
+    records_df["MothName"] = records_df.apply(lambda s: s.replace(" ", "_"))
+    records_df.set_index("MothName", inplace=True)
+    records_dict = records_df["MothCount"].to_dict()
 
     moth_logger.debug(records_dict)
     with open(
         f"{cfg['RECORDS_PATH']}day_count_{date_dash_str.replace('-','')}.json", "w"
     ) as json_out:
         json_out.write(json.dumps(records_dict))
+    return records_dict
 
 
 def show_latest_moths(cursor):
@@ -274,31 +260,31 @@ def show_latest_moths(cursor):
         need to query the database with an SQL string and build the recent
         sightings table."""
 
-    columns = ["Date", "MothName", "MothCount"]
-    # mothname_col = columns.index("MothName")
+    # columns = ["Date", "MothName", "MothCount"]
+    # # mothname_col = columns.index("MothName")
 
-    cursor.execute(
-        f"SELECT {', '.join(columns)} FROM moth_records WHERE "
-        "Date > DATE_ADD(NOW(), INTERVAL -14 DAY);"
-    )
-    records_dict = {row: line for row, line in enumerate(cursor)}
+    # cursor.execute(
+    #     f"SELECT {', '.join(columns)} FROM moth_records WHERE "
+    #     "Date > DATE_ADD(NOW(), INTERVAL -14 DAY);"
+    # )
+    # records_dict = {row: line for row, line in enumerate(cursor)}
 
-    recent_df = pd.DataFrame.from_dict(records_dict, columns=columns, orient="index")
-    print(recent_df)
-    recent_df["Species"] = recent_df["MothName"].apply(
-        lambda mn: f'<a href="/species/{mn}">{mn}</a>'
-    )
-    recent_df["Date"] = recent_df["Date"].apply(
-        lambda dd: f'<a href="/survey/{dd}">{dd}</a>'
-    )
-    recent_df.set_index(["Date", "Species"], inplace=True)
+    # recent_df = pd.DataFrame.from_dict(records_dict, columns=columns, orient="index")
+    # print(recent_df)
+    # recent_df["Species"] = recent_df["MothName"].apply(
+    #     lambda mn: f'<a href="/species/{mn}">{mn}</a>'
+    # )
+    # recent_df["Date"] = recent_df["Date"].apply(
+    #     lambda dd: f'<a href="/survey/{dd}">{dd}</a>'
+    # )
+    # recent_df.set_index(["Date", "Species"], inplace=True)
 
-    return (
-        recent_df["MothCount"]
-        .unstack("Date")
-        .fillna("")
-        .to_html(escape=False, justify="left")
-    )
+    # return (
+    #     recent_df["MothCount"]
+    #     .unstack("Date")
+    #     .fillna("")
+    #     .to_html(escape=False, justify="left")
+    # )
 
 
 def graph_date_overlay():
@@ -360,7 +346,7 @@ def get_db_update_time(use_db: bool = False) -> dt.datetime:
         cursor.close()
         cnx.close()
 
-    if not update_time or not use_db:
+    if not (update_time and use_db):
 
         # If we can't use the database to get the update time we must infer it.
         # I'm using a simple file that gets written on a db update.
@@ -541,13 +527,27 @@ def generate_cummulative_species_graph(cursor):
             [0.0], index=pd.Index([today.year], name="Year"), columns=[str(today)]
         )
     else:
-        cum_results = (
-            cum_species.unstack("Date")
-            .fillna(method="ffill", axis=1)
-            .groupby(by="Year")
-            .count()
-            .Catch.astype(float)
-        )  # Needs to be float for mask to work
+        try:
+            # The initial groupby is intended to remove duplicate indexes
+            cum_results = (
+                cum_species.groupby(["Year", "Date", "MothName"])
+                .sum()
+                .unstack("Date")
+                .fillna(method="ffill", axis=1)
+                .groupby(by="Year")
+                .count()
+                .Catch.astype(float)
+            )  # Needs to be float for mask to work
+        except ValueError:
+            # You've probably updated the taxonomy database and this has caused two
+            # entries on the same date to merge. This needs fixing/checking
+            dups_df = cum_species.groupby(["Year", "Date", "MothName"]).sum()
+            moth_logger.error(
+                "Finding a duplicate species - probably due to updated "
+                "taxonomy database merging species:"
+            )
+            moth_logger.error(dups_df.loc[dups_df.Catch > 1])
+            raise
 
     # Mask future dates to avoid plotting a horizontal line to eoy
     cum_results.loc[today.year].mask(
@@ -956,16 +956,17 @@ def service_static_file(filename):
 @app.route("/survey/<dash_date_str:re:\\d{4}-\\d{2}-\\d{2}>")
 def serve_survey2(dash_date_str=None):
     """ Generate a survey sheet to records today's results in. """
-    cnx = mariadb.connect(**sql_config)
-    db = cnx.cursor()
 
     if dash_date_str:
-        generate_records_file(db, dash_date_str)
-        # TODO we may want to just remove the manifest to simplify the historical
-        # survey sheet.
+        # generate day_count_YYYYMMDD.json file to later recover the records.
+        generate_records_file(None, dash_date_str)
     else:
         dash_date_str = dt.date.today().strftime("%Y-%m-%d")
-        refresh_manifest()  # The manifest shows the moths that could be caught
+
+    # This creates a manifest file which shows possible catches.
+    # The template uses this to populate the survey sheet.
+    # We could just pass this data to the template.
+    refresh_manifest(dash_date_str)
 
     try:
         date_str = dash_date_str.replace("-", "")
@@ -980,8 +981,8 @@ def serve_survey2(dash_date_str=None):
         unmangled_records = []
 
     moth_logger.debug(f"Recent moths:{str(unmangled_records)}")
-    db.close()
-    cnx.close()
+    # db.close()
+    # cnx.close()
 
     return template(
         "vue_survey.tpl", records=unmangled_records, dash_date_str=dash_date_str
@@ -1096,12 +1097,42 @@ def get_species(species):
 def show_latest():
     """ Shows the latest moth catches. """
     # Get a connection to the databe
-    cnx = mariadb.connect(**sql_config)
+    # cnx = mariadb.connect(**sql_config)
 
-    cursor = cnx.cursor()
-    latest_table = show_latest_moths(cursor)
-    cnx.close()
+    # cursor = cnx.cursor()
+    # latest_table = show_latest_moths(cursor)
+    # cnx.close()
 
+    # columns = ["Date", "MothName", "MothCount"]
+    # # mothname_col = columns.index("MothName")
+
+    # cursor.execute(
+    #     f"SELECT {', '.join(columns)} FROM moth_records WHERE "
+    #     "Date > DATE_ADD(NOW(), INTERVAL -14 DAY);"
+    # )
+    # records_dict = {row: line for row, line in enumerate(cursor)}
+
+    # recent_df = pd.DataFrame.from_dict(records_dict, columns=columns, orient="index")
+
+    recent_df = get_table(
+        """SELECT Date, MothName, MothCount FROM moth_records WHERE
+        Date > DATE_ADD(NOW(), INTERVAL -14 DAY) AND MothName != "NULL";"""
+    )
+    print(recent_df)
+    recent_df["Species"] = recent_df["MothName"].apply(
+        lambda mn: f'<a href="/species/{mn}">{mn}</a>'
+    )
+    recent_df["Date"] = recent_df["Date"].apply(
+        lambda dd: f'<a href="/survey/{dd}">{dd}</a>'
+    )
+    recent_df.set_index(["Date", "Species"], inplace=True)
+
+    latest_table = (
+        recent_df["MothCount"]
+        .unstack("Date")
+        .fillna("")
+        .to_html(escape=False, justify="left")
+    )
     return template("latest.tpl", html_table=latest_table)
 
 
@@ -1114,8 +1145,8 @@ def survey_handler():
         cfg["RECORDS_PATH"] + "day_count_" + date_string.replace("-", "") + ".json"
     )
 
-    rs = list()
-    results_dict = dict()
+    rs = []
+    results_dict = {}
     for moth in request.forms.keys():
         if moth == "dash_date_str":
             continue
@@ -1129,6 +1160,7 @@ def survey_handler():
             results_dict[moth] = str(specimens).replace(" ", "_")
 
     # Store results locally  so when survey sheet is recalled it will auto populate
+    # This probably isn't really required as we can access the SQL quickly
     with open(fout_json, "w") as fout_js:
         moth_logger.debug(f"Updating {fout_json} file")
         moth_logger.debug(results_dict)
