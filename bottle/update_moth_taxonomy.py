@@ -7,6 +7,12 @@ Using the date in the name it will check against any stored date.
 If the new date is newer (or old date doesn't exist) the irecord_taxonomy table
 will be (re)written.
 
+History
+-------
+
+20 June 2020 - Made sure list going into common_names.js is sorted.
+   June 2020 - Genesis
+
 """
 import pandas as pd
 import mysql.connector as mariadb
@@ -39,7 +45,7 @@ def update_mothnames():
 
     with open("./static/common_names.js", "w") as fnames:
         fnames.write("var common_names = [")
-        for n in names.MothName:
+        for n in sorted(names.MothName):
             fnames.write('"' + n + '", ')
         fnames.write("];")
 

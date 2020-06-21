@@ -27,6 +27,9 @@ data of bio-survey.
   * Food plant correlation and prediction
 
 ###History
+    21 Jun 2020
+        - Moth name list is now alphanumerically sorted
+        - Moth name list now expires from browser cache in 4hrs
     19 Jun 2020 - Data entry improvements
         - Search list is now punctuation agnostic e.g. White-speck == White speck
         - Duplicates removed from list - fixing a bug that causes list to stick
@@ -37,7 +40,7 @@ data of bio-survey.
     10 Jun 2020 - Started work on aggregating taxon and common names for graphs
     10 Jun 2020 - Changed upload to use Scientific names.
      8 Jun 2020 - Converted to an updatable, iRecord compatible taxonomy database
-     6 Jun 2020 - Moving taxo table to irecord taxonomy and adding update ability
+     6 Jun 2020 - Moving taxo table to irecord taxonomy and adding update abilityq
     25 May 2020 - Tidied data entry screen to provide date na
     24 May 2020 - Tidied Recent catches a little
     24 May 2020 - Improved robustness of get_db_update_time
@@ -949,7 +952,12 @@ def index():
 @app.route("/static/<filename>")
 def service_static_file(filename):
     """ Help route to return static files. """
-    return static_file(f"{filename}", root=cfg["STATIC_PATH"])
+    rsp = static_file(f"{filename}", root=cfg["STATIC_PATH"])
+    if filename == "common_names.js":
+        # cache common_names for 4hrs
+        rsp.set_header("cache-control", f"max-age={4*3600}")
+
+    return rsp
 
 
 @app.route("/survey")
