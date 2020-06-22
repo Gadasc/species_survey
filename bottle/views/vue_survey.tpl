@@ -16,6 +16,18 @@
 
 
 <script>
+
+    function cache_add_species(new_species){
+        record_cache[new_species] = 0;
+        sessionStorage.setItem("{{!dash_date_str}}", JSON.stringify( record_cache));
+    }
+
+    function cache_set_species_count(mod_species, mod_count){
+        record_cache[mod_species] = mod_count;
+        sessionStorage.setItem("{{!dash_date_str}}", JSON.stringify( record_cache));
+    }
+
+
     Vue.component('table-row', {
         template: `
             <tr><td>\{\{record.species\}\}</td></tr>
@@ -38,11 +50,13 @@
                 console.log("Decrement", this.moth_record.species)
                 if (this.moth_record.count > 0){
                     this.moth_record.count -= 1;
+                    cache_set_species_count(this.moth_record.species, this.moth_record.count);
                 }
             },
             increment: function(){
                 console.log("Increment", this.moth_record.species)
                 this.moth_record.count += 1
+                cache_set_species_count(this.moth_record.species, this.moth_record.count);
             }
         }
     })
@@ -121,7 +135,11 @@
                 // Only add the species if it is valid
                 if(value !== "" && typeof value !== 'undefined') {
                     this.$emit("add-species", this.selected_species)
+
+                // Add species to sessionStorage
+                cache_add_species(this.selected_species);
                 }
+
             } ,
             process_down_event: function(event){
                 console.log("auto-list-box DOWN: " + event.type );
@@ -240,6 +258,35 @@
             all_moths.push(item);
         }
     });
+
+    // Now we can check for anything stored in the browser cache.
+    var record_cache = JSON.parse(sessionStorage.getItem("{{!dash_date_str}}"));
+    if (record_cache == null){
+        record_cache = {};
+    } else {
+        console.log("Retrieved sessionStorage", record_cache);
+        Object.entries(record_cache).forEach(function(kv, index){
+            console.log(kv[0], kv[1]);
+
+        // If exists - find index and update record
+        first_match = all_moths.findIndex(function(v){return (v.species == kv[0])});
+        if (first_match !== -1) {
+            // Find index
+            console.log("Found duplicate record for " + kv[0] + " at: " + first_match);
+            // Update record only if the record is null
+            all_moths[first_match].count = kv[1];
+        // else add to list
+        } else {
+            all_moths.push({"species":kv[0], "count":kv[1], "recent":0});
+        }
+
+
+
+
+        });
+    }
+    
+
 
     // Finally sort
     vm.moths = all_moths.sort(function(i1, i2){return i1.species.localeCompare(i2.species)});      

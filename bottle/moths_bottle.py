@@ -27,6 +27,7 @@ data of bio-survey.
   * Food plant correlation and prediction
 
 ###History
+    22 Jun 2020 - added sessionStorage for data entry
     21 Jun 2020
         - Moth name list is now alphanumerically sorted
         - Moth name list now expires from browser cache in 4hrs
