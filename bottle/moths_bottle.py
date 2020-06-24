@@ -193,19 +193,39 @@ def refresh_manifest(dash_date_str):
     """ Check the javascript manifest.js file is up to date.
         dash_date_str is in the form YYYY-MM-DD"""
 
-    recent_df = get_table(
-        f"""SELECT MothName species, sum(MothCount) recent
-        FROM moth_records WHERE
-        Date > DATE_ADD(DATE("{dash_date_str}"), INTERVAL -7 DAY) AND
-        Date <= DATE("{dash_date_str}") GROUP BY species;"""
+    # Legacy SQL query to get manifest
+    # recent_df = get_table(
+    #     f"""SELECT MothName species, sum(MothCount) recent
+    #     FROM moth_records WHERE
+    #     Date > DATE_ADD(DATE("{dash_date_str}"), INTERVAL -7 DAY) AND
+    #     Date <= DATE("{dash_date_str}") GROUP BY species;"""
+    # )
+
+    # reject singletons in most recent two catches.
+    manifest = (
+        get_table(
+            f"""SELECT MothName species, Date, SUM(MothCount) recent
+            FROM moth_records WHERE
+            Date > DATE_ADD(DATE("{dash_date_str}"), INTERVAL -7 DAY) AND
+            Date <= DATE("{dash_date_str}") GROUP BY Date, species;"""
+        )
+        .set_index(["species", "Date"])
+        .unstack("Date")
     )
 
-    # Find singletons in most recent catches.
+    regular = manifest.count(axis=1) > 1
+    last_two_dates = manifest.columns[-2:]
+    seen_recently = manifest[last_two_dates].sum(axis=1) > 0
+    recent_df = manifest.loc[regular | seen_recently].sum(axis=1).reset_index()
+    recent_df.columns = ["species", "recent"]
+
     # generate javascript file to be sent to browsers
     with open(cfg["STATIC_PATH"] + cfg["MANIFEST_FILE"], "w") as mout:
         mout.write("var recent_moths  = [\n")
         for _, r in recent_df.iterrows():
-            mout.write(f'    {{species:"{r.species}", recent:{r.recent}, count:0 }},\n')
+            mout.write(
+                f'    {{species:"{r.species}", recent:{int(r.recent)}, count:0 }},\n'
+            )
         mout.write("];")
 
 
