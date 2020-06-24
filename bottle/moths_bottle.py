@@ -26,8 +26,10 @@ data of bio-survey.
   * Temperature study
   * Food plant correlation and prediction
 
-###History
-    22 Jun 2020 - added sessionStorage for data entry
+### History
+    22 Jun 2020
+       - added sessionStorage for data entry
+       - fixed download as year was always 2020
     21 Jun 2020
         - Moth name list is now alphanumerically sorted
         - Moth name list now expires from browser cache in 4hrs
@@ -1105,24 +1107,6 @@ def get_species(species):
 @app.route("/latest")
 def show_latest():
     """ Shows the latest moth catches. """
-    # Get a connection to the databe
-    # cnx = mariadb.connect(**sql_config)
-
-    # cursor = cnx.cursor()
-    # latest_table = show_latest_moths(cursor)
-    # cnx.close()
-
-    # columns = ["Date", "MothName", "MothCount"]
-    # # mothname_col = columns.index("MothName")
-
-    # cursor.execute(
-    #     f"SELECT {', '.join(columns)} FROM moth_records WHERE "
-    #     "Date > DATE_ADD(NOW(), INTERVAL -14 DAY);"
-    # )
-    # records_dict = {row: line for row, line in enumerate(cursor)}
-
-    # recent_df = pd.DataFrame.from_dict(records_dict, columns=columns, orient="index")
-
     recent_df = get_table(
         """SELECT Date, MothName, MothCount FROM moth_records WHERE
         Date > DATE_ADD(NOW(), INTERVAL -14 DAY) AND MothName != "NULL";"""
@@ -1185,9 +1169,16 @@ def survey_handler():
     # otherwise show data entry for the next day
     page_date = dt.datetime.strptime(date_string, "%Y-%m-%d")
     if page_date.date() == dt.date.today():
-        return show_latest()
+        rsp = show_latest()
     else:
-        return serve_survey2((page_date + dt.timedelta(days=1)).strftime("%Y-%m-%d"))
+        rsp = serve_survey2((page_date + dt.timedelta(days=1)).strftime("%Y-%m-%d"))
+    # Set the a cookie "delete_cache_date" to remove local stored data which woul
+    # over write data if edited on another machine. So we want to delete this
+    # data on a successful submission. The tpl files must handle this and clear
+    # the cookie. This won't handle stale data on one machine from overwriting update
+    # but that is an unlikely edge case.
+    response.set_header("set-cookie", f"delete_cache_date={date_string}")
+    return rsp
 
 
 @app.route("/debug")
@@ -1208,7 +1199,7 @@ def export_data(dl_year, dl_month=None):
     query_string = f"""SELECT mr.Date, CONCAT(mt.MothGenus, " ", mt.MothSpecies) Species,
         mr.MothCount Quantity,
         CONCAT("Lamp used: ",mr.Lamp, "\nCommon Name: ", mt.MothName) Comment
-        FROM (select * FROM moth_records WHERE Year(Date)=2020 {month_option}) mr
+        FROM (select * FROM moth_records WHERE Year(Date)={dl_year} {month_option}) mr
         JOIN moth_taxonomy mt ON mr.MothName=mt.MothName;"""
 
     moth_logger.debug(query_string)
