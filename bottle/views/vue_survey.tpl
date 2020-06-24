@@ -28,17 +28,14 @@
 
 <script>
 
-    function cache_add_species(new_species){
-        record_cache[new_species] = 0;
-        sessionStorage.setItem("{{!dash_date_str}}", JSON.stringify( record_cache));
+    // Helper functions to store updates in sessionStorage until successfully commited.
+    // This protects against accidentally leaving the page, or network failures.
+    function cache_update_species(species_obj){
+        record_cache[species_obj.species] = species_obj;
+        sessionStorage.setItem("{{!dash_date_str}}", JSON.stringify(record_cache));
     }
 
-    function cache_set_species_count(mod_species, mod_count){
-        record_cache[mod_species] = mod_count;
-        sessionStorage.setItem("{{!dash_date_str}}", JSON.stringify( record_cache));
-    }
-
-
+ 
     Vue.component('table-row', {
         template: `
             <tr><td>\{\{record.species\}\}</td></tr>
@@ -48,10 +45,10 @@
 
     Vue.component('moth-entry', {
         template: `<tr>
-                   <td>\{\{moth_record.species\}\}</td>
+                   <td v-bind:class="{'virgin' : isVirgin, 'updated': isUpdated}">\{\{moth_record.species\}\}</td>
                    <td class="recent">\{\{moth_record.recent\}\}</td>
                    <td><button class="round_button" v-on:click.prevent='decrement'>-</button></td>
-                   <td class="count"><input v-bind:name="moth_record.species" v-model="moth_record.count"></td>
+                   <td class="count" v-bind:class="{'virgin' : isVirgin, 'updated': isUpdated}"><input v-bind:name="moth_record.species" v-model="moth_record.count"></td>
                    <td><button class="round_button" v-on:click.prevent="increment">+</button></td>
                    </tr>
                    `,
@@ -61,13 +58,25 @@
                 console.log("Decrement", this.moth_record.species)
                 if (this.moth_record.count > 0){
                     this.moth_record.count -= 1;
-                    cache_set_species_count(this.moth_record.species, this.moth_record.count);
+                    this.moth_record.virgin = false;
+                    this.moth_record.updated = true;
+                    cache_update_species(this.moth_record);
                 }
             },
             increment: function(){
-                console.log("Increment", this.moth_record.species)
-                this.moth_record.count += 1
-                cache_set_species_count(this.moth_record.species, this.moth_record.count);
+                console.log("Increment", this.moth_record.species);
+                this.moth_record.count += 1;
+                this.moth_record.virgin = false;
+                this.moth_record.updated = true;
+                cache_update_species(this.moth_record);
+            }
+        },
+        computed: {
+            isVirgin: function(){
+                return this.moth_record.virgin;
+            },
+            isUpdated: function(){
+                return this.moth_record.updated;
             }
         }
     })
@@ -147,8 +156,6 @@
                 if(value !== "" && typeof value !== 'undefined') {
                     this.$emit("add-species", this.selected_species)
 
-                // Add species to sessionStorage
-                cache_add_species(this.selected_species);
                 }
 
             } ,
@@ -203,7 +210,11 @@
         methods: {
             add_species: function(new_species){
                 console.log(new_species);
-                this.moths.unshift({"species": new_species, "recent": 0, "count": 0});
+                var species_object = {"species": new_species, "recent": 0, "count": 0, "virgin": true, "updated": false,};
+                this.moths.unshift(species_object);
+
+                // Add species to sessionStorage
+                cache_update_species(species_object);
             },
             formatDate: function(date) {
                 var d = new Date(date),
@@ -247,12 +258,17 @@
     // On load we want to combine the likely moths from the manifest and the recently seen moths.
     // This combination is not reactive so can be done once on load. 
 
-    manifest_moths = recent_moths;
+    manifest_moths = recent_moths;  // From manifest.js
     captured_moths = {{!records}};
     // combine manifest_moths and captured moths
     var all_moths = []
     // First add recently seen species from the manifest
-    manifest_moths.forEach(function(item, index){all_moths.push(item)});
+    manifest_moths.forEach(function(item, index){
+            item.virgin = false;
+            item.updated = false;
+            all_moths.push(item);
+        }
+    );
     
     // Now add anything already recorded for this date, add if not a recent species, and update
     // record if it already exists.
@@ -270,6 +286,9 @@
         }
     });
 
+    // Now ensure the list is sorted
+    all_moths.sort(function(i1, i2){return i1.species.localeCompare(i2.species)});
+
     // Now we can check for anything stored in the browser cache.
     var record_cache = JSON.parse(sessionStorage.getItem("{{!dash_date_str}}"));
     if (record_cache == null){
@@ -277,30 +296,26 @@
     } else {
         console.log("Retrieved sessionStorage", record_cache);
         Object.entries(record_cache).forEach(function(kv, index){
-            console.log(kv[0], kv[1]);
+            var mname = kv[0];
+            var mobj = kv[1];
+            console.log(mobj);
 
-        // If exists - find index and update record
-        first_match = all_moths.findIndex(function(v){return (v.species == kv[0])});
-        if (first_match !== -1) {
-            // Find index
-            console.log("Found duplicate record for " + kv[0] + " at: " + first_match);
-            // Update record only if the record is null
-            all_moths[first_match].count = kv[1];
-        // else add to list
-        } else {
-            all_moths.push({"species":kv[0], "count":kv[1], "recent":0});
-        }
-
-
-
-
+            // If exists - find index and update record
+            first_match = all_moths.findIndex(function(v){return (v.species == mname)});
+            if (first_match !== -1) {
+                // Find index
+                console.log("Found existing record for " + mname + " at: " + first_match);
+                // Update record only if the record is null
+                all_moths[first_match] = mobj;
+            // else add to list
+            } else {
+                all_moths.unshift(mobj);
+            }
         });
     }
     
-
-
-    // Finally sort
-    vm.moths = all_moths.sort(function(i1, i2){return i1.species.localeCompare(i2.species)});      
+    // Finally inject into the app
+    vm.moths = all_moths;      
 
 </script>
 

@@ -29,6 +29,7 @@ data of bio-survey.
 ### History
     22 Jun 2020
        - added sessionStorage for data entry
+       - improved formating of data entry to highlight new/unused additions.
        - fixed download as year was always 2020
     21 Jun 2020
         - Moth name list is now alphanumerically sorted
@@ -199,6 +200,7 @@ def refresh_manifest(dash_date_str):
         Date <= DATE("{dash_date_str}") GROUP BY species;"""
     )
 
+    # Find singletons in most recent catches.
     # generate javascript file to be sent to browsers
     with open(cfg["STATIC_PATH"] + cfg["MANIFEST_FILE"], "w") as mout:
         mout.write("var recent_moths  = [\n")
