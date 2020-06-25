@@ -44,11 +44,11 @@
     })
 
     Vue.component('moth-entry', {
-        template: `<tr>
-                   <td v-bind:class="{'virgin' : isVirgin, 'updated': isUpdated}">\{\{moth_record.species\}\}</td>
+        template: `<tr v-bind:class="{'virgin' : isVirgin, 'updated': isUpdated}">
+                   <td>\{\{moth_record.species\}\}</td>
                    <td class="recent">\{\{moth_record.recent\}\}</td>
                    <td><button class="round_button" v-on:click.prevent='decrement'>-</button></td>
-                   <td class="count" v-bind:class="{'virgin' : isVirgin, 'updated': isUpdated}"><input v-bind:name="moth_record.species" v-model="moth_record.count"></td>
+                   <td class="count" ><input v-bind:name="moth_record.species" v-model="moth_record.count"></td>
                    <td><button class="round_button" v-on:click.prevent="increment">+</button></td>
                    </tr>
                    `,
