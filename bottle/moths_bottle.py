@@ -27,6 +27,8 @@ data of bio-survey.
   * Food plant correlation and prediction
 
 ### History
+    25 Jun 2020 - started working on speed improvements
+        - Fixed bug that prevented simple reuse of graphs
     22 Jun 2020
        - added sessionStorage for data entry
        - improved formating of data entry to highlight new/unused additions.
@@ -107,6 +109,8 @@ from markdown import markdown
 import os
 import json
 import html
+import time
+import re
 
 try:
     from app_config_local import app_config as cfg
@@ -147,12 +151,22 @@ formatter = logging.Formatter("%(msg)s")
 file_handler.setFormatter(formatter)
 requests_logger.addHandler(file_handler)
 
+sql_logger = logging.getLogger("sql_logger")
+sql_logger.setLevel(logging.DEBUG)
+sql_file_handler = logging.handlers.RotatingFileHandler(
+    cfg["LOG_PATH"] + "sql_profile.log", maxBytes=1024 * 1024, backupCount=2
+)
+sql_formatter = logging.Formatter("%(msg)s")
+sql_file_handler.setFormatter(sql_formatter)
+sql_logger.addHandler(sql_file_handler)
+
 
 def get_table(sql_query):
     """ Creates a pandas DataFrame from a SQL Query"""
 
     # Establish a connection to the SQL server
     # print(sql_config)
+    start = time.time()
     cnx = mariadb.connect(**sql_config)
     cursor = cnx.cursor()
 
@@ -162,6 +176,8 @@ def get_table(sql_query):
 
     cursor.close()
     cnx.close()
+    one_line_query = re.sub("[\n\\s]+", " ", sql_query)
+    sql_logger.debug(f"{time.time()-start}\t{len(count_df)}\t{one_line_query}")
     return count_df
 
 
@@ -192,14 +208,6 @@ def log_to_logger(fn):
 def refresh_manifest(dash_date_str):
     """ Check the javascript manifest.js file is up to date.
         dash_date_str is in the form YYYY-MM-DD"""
-
-    # Legacy SQL query to get manifest
-    # recent_df = get_table(
-    #     f"""SELECT MothName species, sum(MothCount) recent
-    #     FROM moth_records WHERE
-    #     Date > DATE_ADD(DATE("{dash_date_str}"), INTERVAL -7 DAY) AND
-    #     Date <= DATE("{dash_date_str}") GROUP BY species;"""
-    # )
 
     # reject singletons in most recent two catches.
     manifest = (
@@ -280,39 +288,6 @@ def generate_records_file(cursor, date_dash_str):
     ) as json_out:
         json_out.write(json.dumps(records_dict))
     return records_dict
-
-
-def show_latest_moths(cursor):
-    """ Generate a table showing the latest records.
-        Because we are using mysql.connector instead sqlalchemy which ORM we
-        need to query the database with an SQL string and build the recent
-        sightings table."""
-
-    # columns = ["Date", "MothName", "MothCount"]
-    # # mothname_col = columns.index("MothName")
-
-    # cursor.execute(
-    #     f"SELECT {', '.join(columns)} FROM moth_records WHERE "
-    #     "Date > DATE_ADD(NOW(), INTERVAL -14 DAY);"
-    # )
-    # records_dict = {row: line for row, line in enumerate(cursor)}
-
-    # recent_df = pd.DataFrame.from_dict(records_dict, columns=columns, orient="index")
-    # print(recent_df)
-    # recent_df["Species"] = recent_df["MothName"].apply(
-    #     lambda mn: f'<a href="/species/{mn}">{mn}</a>'
-    # )
-    # recent_df["Date"] = recent_df["Date"].apply(
-    #     lambda dd: f'<a href="/survey/{dd}">{dd}</a>'
-    # )
-    # recent_df.set_index(["Date", "Species"], inplace=True)
-
-    # return (
-    #     recent_df["MothCount"]
-    #     .unstack("Date")
-    #     .fillna("")
-    #     .to_html(escape=False, justify="left")
-    # )
 
 
 def graph_date_overlay():
@@ -412,6 +387,8 @@ def get_moth_grid(db):
                     GROUP BY Year, Month, MothName
             ) tw
         GROUP BY Year, Month, MothName;"""
+    # species_df = get_table(sql_species_name_by_month_year)
+    # species_df.set_index(list(species_df.columns))
 
     db.execute(sql_species_name_by_month_year)
     data_list = [list(c) for c in db]
@@ -596,7 +573,7 @@ def generate_cummulative_species_graph(cursor):
 
 
 def graph_mothname_v2(mothname):
-
+    start = time.time()
     query_str = f"""SELECT mr.Date, mr.MothCount
         FROM (select * from {cfg['TAXONOMY_TABLE']} where MothName = "{mothname}") sp
         JOIN {cfg['TAXONOMY_TABLE']} re
@@ -605,12 +582,12 @@ def graph_mothname_v2(mothname):
         ON mr.MothName = re.MothName
         GROUP BY mr.Date;"""
     catches_df = get_table(query_str)
-
+    print(">>> 1st table done: ", time.time() - start)
     # Test results
-    moth_logger.debug(f"Latest date: {catches_df.Date.max()}")
+    moth_logger.debug(f"Most recent catch date: {catches_df.Date.max()}")
     try:
         moth_logger.debug(
-            f"{mothname}.png modified: "
+            f"{mothname}.png last modified: "
             f'{dt.date.fromtimestamp(os.path.getmtime(f"{GRAPH_PATH}{mothname}.png"))}'
         )
     except FileNotFoundError:
@@ -638,11 +615,11 @@ def graph_mothname_v2(mothname):
         moth_logger.debug(f"File: {mothname}.png was updated: {file_update_time}")
         db_update_time = get_db_update_time()
         moth_logger.debug(f"Database:            was updated: {db_update_time}")
-        if file_update_time > db_update_time and file_update_time.year < today.year:
-            return
     except (FileNotFoundError, TypeError):
         moth_logger.debug("File still not found")
 
+    moth_logger.debug(f"Generating graph: {GRAPH_PATH}{mothname}.png")
+    print(">>> 2 decission made: ", time.time() - start)
     date_year_index = pd.DatetimeIndex(
         pd.date_range(
             start=today.replace(month=1, day=1), end=today.replace(month=12, day=31)
@@ -679,6 +656,7 @@ def graph_mothname_v2(mothname):
     plt.setp(ax.xaxis.get_majorticklabels(), ha="left")
     plt.savefig(f"{GRAPH_PATH}{mothname}.png")
     plt.close()
+    print(">>> 3 graph done: ", time.time() - start)
 
 
 app = Bottle()
