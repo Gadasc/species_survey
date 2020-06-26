@@ -615,6 +615,8 @@ def graph_mothname_v2(mothname):
         moth_logger.debug(f"File: {mothname}.png was updated: {file_update_time}")
         db_update_time = get_db_update_time()
         moth_logger.debug(f"Database:            was updated: {db_update_time}")
+        if file_update_time > db_update_time and file_update_time.year < today.year:
+            return
     except (FileNotFoundError, TypeError):
         moth_logger.debug("File still not found")
 

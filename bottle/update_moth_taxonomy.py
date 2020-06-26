@@ -205,6 +205,7 @@ def update_table_moth_taxonomy():
     )
     get_table(f"CREATE INDEX IF NOT EXISTS tax_TVK ON {cfg['TAXONOMY_TABLE']}(TVK);")
     get_table(f"CREATE INDEX IF NOT EXISTS rec_MothName ON moth_records(MothName);")
+    get_table(f"CREATE INDEX IF NOT EXISTS rec_Date ON moth_records(Date);")
 
     # Check if an updated list exists
     update_list_file = update_check()
