@@ -176,8 +176,8 @@ def get_table(sql_query):
 
     cursor.close()
     cnx.close()
-    one_line_query = re.sub("\n", "", sql_query)
-    sql_logger.debug(f"{time.time()-start}, {len(count_df)}, {one_line_query}")
+    one_line_query = re.sub("[\n\\s]+", " ", sql_query)
+    sql_logger.debug(f"{time.time()-start}\t{len(count_df)}\t{one_line_query}")
     return count_df
 
 
@@ -387,6 +387,8 @@ def get_moth_grid(db):
                     GROUP BY Year, Month, MothName
             ) tw
         GROUP BY Year, Month, MothName;"""
+    # species_df = get_table(sql_species_name_by_month_year)
+    # species_df.set_index(list(species_df.columns))
 
     db.execute(sql_species_name_by_month_year)
     data_list = [list(c) for c in db]

@@ -10,6 +10,7 @@ will be (re)written.
 History
 -------
 
+26 June 2020 - Added indexes
 20 June 2020 - Made sure list going into common_names.js is sorted.
    June 2020 - Genesis
 
@@ -197,6 +198,13 @@ def update_records(mapfile_name):
 
 def update_table_moth_taxonomy():
     # TODO Turn off auto commit so we can roll back if issues are found
+
+    # TODO Remove once tested in the main functions
+    get_table(
+        f"CREATE INDEX IF NOT EXISTS tax_MothName ON {cfg['TAXONOMY_TABLE']}(MothName);"
+    )
+    get_table(f"CREATE INDEX IF NOT EXISTS tax_TVK ON {cfg['TAXONOMY_TABLE']}(TVK);")
+    get_table(f"CREATE INDEX IF NOT EXISTS rec_MothName ON moth_records(MothName);")
 
     # Check if an updated list exists
     update_list_file = update_check()
