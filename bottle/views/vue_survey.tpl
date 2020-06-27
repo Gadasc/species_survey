@@ -14,6 +14,7 @@
 </body>
 
 <script>
+
     // This code will look for a cookie "delete_cache_date" and delete the sessionStorage 
     // data with that key. Finally the cookie is removed.
     var cindex = document.cookie.indexOf("delete_cache_date="); 
@@ -187,7 +188,7 @@
         <div>
         <form id="mothsForm" autocomplete="off" action="/handle_survey" method="post" v-on:keydown.enter.prevent>
         Date: <a class=daynav v-bind:href=yesterday>&#9664;</a>
-              <input class="survey_date" type="text" name="dash_date_str"  value="{{!dash_date_str}}" readonly>
+              <input class="survey_date" type="date" name="dash_date_str" v-bind:max="get_today_str" v-model:value="this_date" required @change="jumpDate">
               <a class=daynav v-bind:href=tomorrow>&#9654;</a></p>
         <table>
         <thead><tr><th>Species</th><th>Recent</th><th></th><th>Count</th><th></th></tr></thead>
@@ -204,7 +205,8 @@
        
         data: function() {
             return {
-                moths: []
+                moths: [],
+                this_date: "{{!dash_date_str}}"
             }
         },
         methods: {
@@ -228,6 +230,10 @@
                     day = '0' + day;
 
                 return [year, month, day].join('-');
+            },
+            jumpDate: function(){
+                console.log("Date picker", this.this_date);
+                window.location.href = "/survey/" + this.this_date;
             }
         },
         computed: {
@@ -249,6 +255,15 @@
                 ms = tdy.getTime();
                 ms += 24*60*60*1000;
                 return "/survey/"+this.formatDate(ms);
+            },
+            get_today_str: function(){
+                    var today = new Date();
+                    var dd = String(today.getDate()).padStart(2, '0');
+                    var mm = String(today.getMonth() + 1).padStart(2, '0'); //January is 0!
+                    var yyyy = today.getFullYear();
+
+                    today_str = yyyy + '-' + mm + '-' + dd;
+                    return today_str;
             }
         }
         

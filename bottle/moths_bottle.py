@@ -27,7 +27,10 @@ data of bio-survey.
   * Food plant correlation and prediction
 
 ### History
-    25 Jun 2020 - started working on speed improvements
+    27 Jun 2020
+        - Added a Date picker to the data entry page
+    25 Jun 2020
+        - db access optimised
         - Fixed bug that prevented simple reuse of graphs
     22 Jun 2020
        - added sessionStorage for data entry
