@@ -27,6 +27,8 @@ data of bio-survey.
   * Food plant correlation and prediction
 
 ### History
+    29 Jun 2020
+        - Fixed export bug that pulled from wrong taxonomy table
     27 Jun 2020
         - Added a Date picker to the data entry page
     25 Jun 2020
@@ -1205,7 +1207,7 @@ def export_data(dl_year, dl_month=None):
         mr.MothCount Quantity,
         CONCAT("Lamp used: ",mr.Lamp, "\nCommon Name: ", mt.MothName) Comment
         FROM (select * FROM moth_records WHERE Year(Date)={dl_year} {month_option}) mr
-        JOIN moth_taxonomy mt ON mr.MothName=mt.MothName;"""
+        JOIN {cfg["TAXONOMY_TABLE"]} mt ON mr.MothName=mt.MothName;"""
 
     moth_logger.debug(query_string)
     export_data = get_table(query_string)
