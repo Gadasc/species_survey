@@ -28,6 +28,7 @@ data of bio-survey.
 
 ### History
     29 Jun 2020
+        - Fixed date on survey sheet which got lost on ^-back in history
         - Fixed export bug that pulled from wrong taxonomy table
     27 Jun 2020
         - Added a Date picker to the data entry page
