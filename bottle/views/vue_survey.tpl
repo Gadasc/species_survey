@@ -186,9 +186,9 @@
         el: '#app',
         template: `    
         <div>
-        <form id="mothsForm" autocomplete="off" action="/handle_survey" method="post" v-on:keydown.enter.prevent>
+        <form id="mothsForm" autocomplete="on" action="/handle_survey" method="post" v-on:keydown.enter.prevent>
         Date: <a class=daynav v-bind:href=yesterday>&#9664;</a>
-              <input class="survey_date" type="date" name="dash_date_str" v-bind:max="get_today_str" v-model:value="this_date" required @change="jumpDate">
+              <input class="survey_date"  type="date" name="dash_date_str" v-bind:max="get_today_str" v-model:value="this_date" required @change="jumpDate">
               <a class=daynav v-bind:href=tomorrow>&#9654;</a></p>
         <table>
         <thead><tr><th>Species</th><th>Recent</th><th></th><th>Count</th><th></th></tr></thead>
