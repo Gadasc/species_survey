@@ -1,0 +1,81 @@
+.latest_table {
+    border-collapse: collapse;
+    text-align: left;
+}
+
+.latest_table thead {
+    background-color: #a7bcd7;
+}
+
+.latest_table thead tr:first-child th:first-child {
+    text-align: right;
+}
+
+.latest_table thead tr:nth-child(2) th:first-child {
+    text-align: right;
+}
+
+
+.latest_table > tbody tr:nth-child(even) {
+    background-color: #e2e9f2;
+}
+
+.latest_table thead tr th {
+    padding: 5px 20px 5px 5px;
+}
+
+.latest_table thead a {
+    text-decoration: none;
+    color: black;
+}
+
+.latest_table tbody a {
+    text-decoration: none;
+    color: inherit;
+}
+
+.latest_table th {
+    border-width: 0px 1px;
+    position: relative;
+}
+
+.latest_table td {
+    border-width: 0px 1px;
+}
+
+.ffy {
+    background-color: green;
+}
+
+.nft {
+    background-color: gold;
+}
+
+/* Tooltip container */
+.tooltip {
+    /*position: absolute;*/
+    /*display: inline-block;*/
+    border-bottom: 1px dotted black; /* If you want dots under the hoverable text */
+}
+  
+/* Tooltip text */
+.tooltip .tooltiptext {
+    position: absolute;
+    visibility: hidden;
+    width: 120px;
+    background-color: #777;
+    color: #fff;
+    text-align: center;
+    padding: 5px 0;
+    border-radius: 6px;
+
+    /* Position the tooltip text - see examples below! */
+    position: absolute;
+    top: -5px;
+    left: 105%; 
+}
+
+/* Show the tooltip text when you mouse over the tooltip container */
+.tooltip:hover .tooltiptext {
+    visibility: visible;
+}

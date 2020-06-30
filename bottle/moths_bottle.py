@@ -28,7 +28,9 @@ data of bio-survey.
 
 ### History
     29 Jun 2020
+        - Improved /latest including highlights for FFY and New For Trap
         - Fixed date on survey sheet which got lost on ^-back in history
+        - Reorder menu & added short cuts for most recent and last updated survey dates
         - Fixed export bug that pulled from wrong taxonomy table
     27 Jun 2020
         - Added a Date picker to the data entry page
@@ -90,6 +92,11 @@ data of bio-survey.
     20 Jul 2019 - starting to optimise so graphs aren't redrawn unless required.
     16 Jul 2019 - Profiling using werkzeug
     13 Jul 2019 - Initial trial page producing a table and graph of catches.
+
+
+
+
+[1]:/latest
 
 """
 
@@ -167,7 +174,7 @@ sql_file_handler.setFormatter(sql_formatter)
 sql_logger.addHandler(sql_file_handler)
 
 
-def get_table(sql_query):
+def get_table(sql_query, multi=False):
     """ Creates a pandas DataFrame from a SQL Query"""
 
     # Establish a connection to the SQL server
@@ -176,7 +183,7 @@ def get_table(sql_query):
     cnx = mariadb.connect(**sql_config)
     cursor = cnx.cursor()
 
-    cursor.execute(sql_query)
+    cursor.execute(sql_query, multi=multi)
     data_list = [list(c) for c in cursor]
     count_df = pd.DataFrame(data_list, columns=list(cursor.column_names))
 
@@ -971,6 +978,26 @@ def service_static_file(filename):
     return rsp
 
 
+@app.route("/last_survey")
+def last_survey():
+    """ Identifies the most recent record, and jumps to that survey sheet. """
+
+    latest_record = get_table(
+        "SELECT Date, MothName FROM moth_records ORDER by Id DESC LIMIT 1;"
+    ).iloc[0]["Date"]
+    return serve_survey2(dash_date_str=latest_record.strftime("%Y-%m-%d"))
+
+
+@app.route("/recent_survey")
+def recent_survey():
+    """ Identifies the most recent record, and jumps to that survey sheet. """
+
+    latest_record = get_table(
+        "SELECT Date, MothName FROM moth_records ORDER by Date DESC LIMIT 1;"
+    ).iloc[0]["Date"]
+    return serve_survey2(dash_date_str=latest_record.strftime("%Y-%m-%d"))
+
+
 @app.route("/survey")
 @app.route("/survey/<dash_date_str:re:\\d{4}-\\d{2}-\\d{2}>")
 def serve_survey2(dash_date_str=None):
@@ -1112,29 +1139,91 @@ def get_species(species):
         )
 
 
+def create_species_div(mothname, ffy=False, nft=False):
+    """ Called from pd.apply
+        Returns a <div> of HTML enclosing mothname and CSS styles
+    """
+    classes = "nft" if nft else "ffy" if ffy else ""
+    tt = ""
+
+    if nft:
+        tooltiptext = "New For Trap"
+    elif ffy:
+        tooltiptext = "First For Year"
+    else:
+        tooltiptext = ""
+
+    if nft or ffy:
+        tt = f'<span class="tooltiptext">{tooltiptext}</span>'
+        classes += " tooltip"
+
+    moth_link = f'<a href="/species/{mothname}">{mothname}</a>'
+    return f'<div class="{classes}">{moth_link}{tt}</div>'
+
+
 @app.route("/latest")
 def show_latest():
     """ Shows the latest moth catches. """
+    # recent_df = get_table(
+    #     """SELECT Date, MothName, MothCount FROM moth_records WHERE
+    #     Date > DATE_ADD(NOW(), INTERVAL -14 DAY) AND MothName != "NULL";"""
+    # )
     recent_df = get_table(
-        """SELECT Date, MothName, MothCount FROM moth_records WHERE
-        Date > DATE_ADD(NOW(), INTERVAL -14 DAY) AND MothName != "NULL";"""
+        """SELECT mr.Date, mr.MothName, mr.MothCount FROM moth_records mr
+            JOIN
+        (SELECT Date from moth_records
+            GROUP BY Date
+            ORDER BY DATE DESC LIMIT 14) dates
+            ON mr.Date = dates.Date ORDER BY Date;"""
     )
-    print(recent_df)
+
+    months = [rd.month for rd in recent_df.Date.unique()]
+    month_count = {mm: months.count(mm) for mm in set(months)}
+    biggest_month = sorted(month_count.items(), key=lambda kv: kv[1], reverse=True)[0][
+        0
+    ]
+    recent_df["Month"] = recent_df["Date"].apply(
+        lambda dd: f"{dd.strftime('%b %Y' if dd.month == biggest_month else '%b')}"
+    )
+
+    # Find New For Trap and First For Year
+    nft = get_table(
+        f"""SELECT MothName, Date from moth_records
+        JOIN (
+        SELECT MothName, TVK from {cfg["TAXONOMY_TABLE"]}) it USING (MothName)
+        GROUP BY TVK Having COUNT(TVK) = 1 AND Date = Date(NOW());"""
+    ).MothName.to_list()
+    print(nft)
+
+    ffy = get_table(
+        f"""SELECT MothName, Date FROM
+        moth_records
+        JOIN (
+        SELECT MothName, TVK from {cfg["TAXONOMY_TABLE"]}) it USING (MothName)
+        WHERE YEAR(Date) = YEAR(NOW())
+        GROUP BY TVK Having COUNT(TVK) = 1 AND Date = Date(NOW());"""
+    ).MothName.to_list()
+    print(ffy)
+
     recent_df["Species"] = recent_df["MothName"].apply(
-        lambda mn: f'<a href="/species/{mn}">{mn}</a>'
+        lambda mn: create_species_div(mn, ffy=mn in ffy, nft=mn in nft)
     )
     recent_df["Date"] = recent_df["Date"].apply(
-        lambda dd: f'<a href="/survey/{dd}">{dd}</a>'
+        lambda dd: f'<a href="/survey/{dd}">{dd.strftime("%d")}</a>'
     )
-    recent_df.set_index(["Date", "Species"], inplace=True)
+    recent_df.set_index(["Month", "Date", "MothName", "Species"], inplace=True)
 
     latest_table = (
         recent_df["MothCount"]
-        .unstack("Date")
+        .unstack(["Month", "Date"])
         .fillna("")
-        .to_html(escape=False, justify="left")
+        .droplevel("MothName")
     )
-    return template("latest.tpl", html_table=latest_table)
+
+    return template(
+        "latest.tpl",
+        html_table=latest_table.to_html(escape=False, classes="latest_table"),
+    )
 
 
 @app.post("/handle_survey")
