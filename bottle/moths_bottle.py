@@ -29,7 +29,7 @@ data of bio-survey.
 ### History
      1 Jul 2020
         - On home page set focus to search box when it loads.
-
+        - Latest page highlight persist while first is in table - not just latest date
     29 Jun 2020
         - Improved /latest including highlights for FFY and New For Trap
         - Fixed date on survey sheet which got lost on ^-back in history
@@ -1166,11 +1166,8 @@ def create_species_div(mothname, ffy=False, nft=False):
 
 @app.route("/latest")
 def show_latest():
-    """ Shows the latest moth catches. """
-    # recent_df = get_table(
-    #     """SELECT Date, MothName, MothCount FROM moth_records WHERE
-    #     Date > DATE_ADD(NOW(), INTERVAL -14 DAY) AND MothName != "NULL";"""
-    # )
+    """ Shows the latest catches for 14 traps . """
+
     recent_df = get_table(
         """SELECT mr.Date, mr.MothName, mr.MothCount FROM moth_records mr
             JOIN
@@ -1180,6 +1177,7 @@ def show_latest():
             ON mr.Date = dates.Date ORDER BY Date;"""
     )
 
+    # Some nice formating for the month hdg - only include year on month with most days
     months = [rd.month for rd in recent_df.Date.unique()]
     month_count = {mm: months.count(mm) for mm in set(months)}
     biggest_month = sorted(month_count.items(), key=lambda kv: kv[1], reverse=True)[0][
@@ -1189,27 +1187,36 @@ def show_latest():
         lambda dd: f"{dd.strftime('%b %Y' if dd.month == biggest_month else '%b')}"
     )
 
+    # Catches may be added in a any order, so it's possibe the user will always look
+    # at the latest page when they add the FFY/NFT so we need to flag when the earliest
+    # catch on the display is the FFY/NFT.
+
+    earliest_table_date = min(recent_df.Date)
+
     # Find New For Trap and First For Year
-    nft = get_table(
+    # nft = get_table(
+    #     f"""SELECT MothName, Date from moth_records
+    #     JOIN (
+    #     SELECT MothName, TVK from {cfg["TAXONOMY_TABLE"]}) it USING (MothName)
+    #     GROUP BY TVK Having COUNT(TVK) = 1 AND Date = Date(NOW());"""
+    not_nft = get_table(
         f"""SELECT MothName, Date from moth_records
         JOIN (
         SELECT MothName, TVK from {cfg["TAXONOMY_TABLE"]}) it USING (MothName)
-        GROUP BY TVK Having COUNT(TVK) = 1 AND Date = Date(NOW());"""
+        GROUP BY TVK Having COUNT(TVK) > 0 AND Date < Date("{earliest_table_date}");"""
     ).MothName.to_list()
-    print(nft)
 
-    ffy = get_table(
+    not_ffy = get_table(
         f"""SELECT MothName, Date FROM
         moth_records
         JOIN (
         SELECT MothName, TVK from {cfg["TAXONOMY_TABLE"]}) it USING (MothName)
         WHERE YEAR(Date) = YEAR(NOW())
-        GROUP BY TVK Having COUNT(TVK) = 1 AND Date = Date(NOW());"""
+        GROUP BY TVK Having COUNT(TVK) > 0 AND Date < Date("{earliest_table_date}");"""
     ).MothName.to_list()
-    print(ffy)
 
     recent_df["Species"] = recent_df["MothName"].apply(
-        lambda mn: create_species_div(mn, ffy=mn in ffy, nft=mn in nft)
+        lambda mn: create_species_div(mn, ffy=mn not in not_ffy, nft=mn not in not_nft)
     )
     recent_df["Date"] = recent_df["Date"].apply(
         lambda dd: f'<a href="/survey/{dd}">{dd.strftime("%d")}</a>'
