@@ -27,6 +27,9 @@ data of bio-survey.
   * Food plant correlation and prediction
 
 ### History
+     1 Jul 2020
+        - On home page set focus to search box when it loads.
+
     29 Jun 2020
         - Improved /latest including highlights for FFY and New For Trap
         - Fixed date on survey sheet which got lost on ^-back in history
