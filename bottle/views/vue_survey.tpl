@@ -45,7 +45,7 @@
     })
 
     Vue.component('moth-entry', {
-        template: `<tr v-bind:class="{'virgin' : isVirgin, 'updated': isUpdated}">
+        template: `<tr v-bind:class="{'virgin' : isVirgin, 'updated': isUpdated}" :id="uriSpecies">
                    <td>\{\{moth_record.species\}\}</td>
                    <td class="recent">\{\{moth_record.recent\}\}</td>
                    <td><button class="round_button" v-on:click.prevent='decrement'>-</button></td>
@@ -78,6 +78,9 @@
             },
             isUpdated: function(){
                 return this.moth_record.updated;
+            },
+            uriSpecies: function(){
+                return encodeURI(this.moth_record.species);
             }
         }
     })
@@ -115,7 +118,8 @@
                 v-bind:match_species=match 
                 v-bind:key=match 
                 v-on:clicked_me="select_species" 
-                v-bind:class='{"match_list_item-active": (match === matched_names[highlighted_species])}' />
+                v-bind:class='{"match_list_item-active": (match === matched_names[highlighted_species]), 
+                               "match_list_item-included": (current_moths.includes(match.toLowerCase()))}' />
             </div>
             </div>
             `,
@@ -134,7 +138,8 @@
         },
         methods: {
             match_filter: function(mname) {
-                return mname.toLowerCase().replace(/[^a-z]/g, " ").includes(this.lower_search_text) && !this.current_moths.includes(mname.toLowerCase());
+                return mname.toLowerCase().replace(/[^a-z]/g, " ").includes(this.lower_search_text);
+                    /* I want to include already selected items && !this.current_moths.includes(mname.toLowerCase()); */
             },
             list_candidates: function(event){
                 this.search_text = event.target.value;
@@ -211,6 +216,15 @@
         },
         methods: {
             add_species: function(new_species){
+                /* Guard against adding the same moth twice */
+                console.log("Adding:", new_species);
+                if (this.moths.map(function(i){console.log(i["species"]); return i["species"];}).includes(new_species)) {
+                    console.log("Scrolling to existing - ", new_species);
+                    var es = document.getElementById(encodeURI(new_species))
+                    es.scrollIntoView();;
+                    return
+                }
+
                 console.log(new_species);
                 var species_object = {"species": new_species, "recent": 0, "count": 0, "virgin": true, "updated": false,};
                 this.moths.unshift(species_object);
