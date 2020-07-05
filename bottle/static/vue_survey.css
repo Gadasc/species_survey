@@ -32,6 +32,11 @@ body {
 
 .recent {
   text-align: center;
+  background-color: inherit;
+}
+
+td {
+  background-color: inherit;
 }
 
 .count {
@@ -146,4 +151,14 @@ tr:nth-child(even) {background-color: #f2f2f2}
 
 .updated {
   color: 	#be7092;
+}
+
+.flash {
+  animation: myflash 1s normal ease-out;
+  animation-fill-mode: backwards;
+}
+
+@keyframes myflash {
+  from {background-color: #7092be;}
+/*  to {background-color: initial;} */
 }

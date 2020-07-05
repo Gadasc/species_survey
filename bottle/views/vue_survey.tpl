@@ -45,7 +45,7 @@
     })
 
     Vue.component('moth-entry', {
-        template: `<tr v-bind:class="{'virgin' : isVirgin, 'updated': isUpdated}" :id="uriSpecies">
+        template: `<tr v-bind:class="{'virgin' : isVirgin, 'updated': isUpdated, 'flash': flash_flag}" :id="uriSpecies">
                    <td>\{\{moth_record.species\}\}</td>
                    <td class="recent">\{\{moth_record.recent\}\}</td>
                    <td><button class="round_button" v-on:click.prevent='decrement'>-</button></td>
@@ -54,6 +54,11 @@
                    </tr>
                    `,
         props: ['moth_record'],
+        data: function(){
+            return {
+                flash_flag: false
+            }
+        },
         methods: {
             decrement: function(){
                 console.log("Decrement", this.moth_record.species)
@@ -70,6 +75,9 @@
                 this.moth_record.virgin = false;
                 this.moth_record.updated = true;
                 cache_update_species(this.moth_record);
+            },
+            setFlashFlag: function(bval){
+                this.flash_flag = bval;
             }
         },
         computed: {
@@ -200,7 +208,7 @@
         <tbody>
             <tr><td colspan="5" style="width: 100%;"><auto-list-box v-on:add-species="add_species" v-bind:current_moths="current_moths"></auto-list-box></td>
             </tr>
-            <moth-entry v-for="moth in moths" v-bind:key='moth.species' v-bind:moth_record='moth' />
+            <moth-entry v-for="moth in moths" v-bind:key='moth.species' v-bind:moth_record='moth' :ref='moth.species' />
         </tbody>
         </table>
         <button type="submit">Submit</button>
@@ -220,9 +228,14 @@
                 console.log("Adding:", new_species);
                 if (this.moths.map(function(i){console.log(i["species"]); return i["species"];}).includes(new_species)) {
                     console.log("Scrolling to existing - ", new_species);
-                    var es = document.getElementById(encodeURI(new_species))
-                    es.scrollIntoView();;
-                    return
+                    var uri_ns = encodeURI(new_species);
+                    var es = document.getElementById(uri_ns);
+                    this.$refs[new_species][0].setFlashFlag(true);
+                    es.scrollIntoView();
+                    es.style.animation = 'none';
+                    es.offsetHeight; /* trigger reflow */
+                    es.style.animation = null; 
+                    return;
                 }
 
                 console.log(new_species);
