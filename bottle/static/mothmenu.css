@@ -18,11 +18,12 @@ h1 {
 
 .top_menu UL{
 	position:relative;
-	float:left;
 	left:0;
 	margin:0;
 	padding:0;
-    background: #7092BE;
+	background: #7092BE;
+	height: 100%;
+	display: inline-block;
 }
 
 .top_menu LI{
@@ -34,7 +35,7 @@ h1 {
 	font-weight: bold;	
 	text-align: center;
 	position: relative;
-    
+	height: 100%;
 }
 
 

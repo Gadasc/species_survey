@@ -30,7 +30,7 @@ data of bio-survey.
      1 Jul 2020
         - On home page set focus to search box when it loads
         - Latest page highlight persist while first is in table - not just latest date
-        - No includes all species in drop down list, and jumps to species that exist
+        - Now includes all species in drop down list, and jumps to species that exist
     29 Jun 2020
         - Improved /latest including highlights for FFY and New For Trap
         - Fixed date on survey sheet which got lost on ^-back in history
