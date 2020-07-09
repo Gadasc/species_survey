@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta http-equiv="cache-control" content="no-cache" />
     <script src="/static/vue.js"></script>
     <script src="/static/common_names.js?"></script>
     <link rel="stylesheet" type="text/css" href="/static/vue_survey.css">

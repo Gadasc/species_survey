@@ -1,4 +1,5 @@
 <nav class="top_menu">
+<div class="outer"> 
 <ul>
 <li><a href="/">Home</a></li>
 <li><a href="/survey">Survey Sheet</a>
@@ -15,5 +16,6 @@
 <li><a href="/export">Export</a></li>
 <li><a href="/help">Help</a></li>
 </ul>
+</div>
 </nav>
 <div class="clearfix"></div>
