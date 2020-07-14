@@ -14,6 +14,7 @@
 <li><a href="/family">Family Summary</a></li>
 <li><a href="/summary">Summary</a></li>
 <li><a href="/export">Export</a></li>
+<li><a href="/options">Options</a></li>
 <li><a href="/help">Help</a></li>
 </ul>
 </div>

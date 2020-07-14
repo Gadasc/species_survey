@@ -196,10 +196,26 @@ def update_records(mapfile_name):
     return True
 
 
+def set_column_default(col_name, def_value):
+    """ Encapsulates the methods for updating the column defaults
+    """
+
+    get_table(
+        f"""ALTER TABLE moth_records ALTER {col_name} SET DEFAULT "{def_value}";"""
+    )
+
+
+def get_column_default(col_name):
+    """ Encapsulates the retrieval of a column default value
+    """
+    records_description = get_table("DESCRIBE moth_records;").set_index("Field")
+    return records_description.loc[col_name]["Default"]
+
+
 def update_table_moth_taxonomy():
     # TODO Turn off auto commit so we can roll back if issues are found
 
-    # TODO Remove once tested in the main functions
+    # TODO Move to a function to ensure the databases are up to date
     get_table(
         f"CREATE INDEX IF NOT EXISTS tax_MothName ON {cfg['TAXONOMY_TABLE']}(MothName);"
     )
@@ -207,6 +223,15 @@ def update_table_moth_taxonomy():
     get_table(f"CREATE INDEX IF NOT EXISTS rec_MothName ON moth_records(MothName);")
     get_table(f"CREATE INDEX IF NOT EXISTS rec_Date ON moth_records(Date);")
 
+    # Ensure additional columns exist - don't set default.
+    # If no value set, then it will get automatically updated when the first
+    # default is set.
+    get_table("ALTER TABLE moth_records ADD COLUMN IF NOT EXISTS" " Recorder CHAR(50);")
+    get_table("ALTER TABLE moth_records ADD COLUMN IF NOT EXISTS" " Trap CHAR(30);")
+    get_table("ALTER TABLE moth_records ADD COLUMN IF NOT EXISTS" " Location CHAR(30);")
+
+    # Main function starts here
+    #
     # Check if an updated list exists
     update_list_file = update_check()
     if not update_list_file:

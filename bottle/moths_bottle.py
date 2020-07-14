@@ -27,6 +27,7 @@ data of bio-survey.
   * Food plant correlation and prediction
 
 ### History
+     9 Jul 2020 - started to develop additional data for iRecord. ghi0020
      1 Jul 2020
         - On home page set focus to search box when it loads
         - Latest page highlight persist while first is in table - not just latest date
@@ -1356,6 +1357,158 @@ def survey_help():
         moth_logger.debug(rte)
     output += "</ul>"
     return output
+
+
+@app.route("/options")
+def config_options():
+    """ Configuration page for options
+    """
+    # TODO: Replace horrible global value with an update of the SQL DB
+    global location_list
+    global trap_list
+    global recorder_list
+    try:
+        type(location_list)
+    except NameError:
+        location_list = {}
+    try:
+        type(trap_list)
+    except NameError:
+        trap_list = set()
+    try:
+        type(recorder_list)
+    except NameError:
+        recorder_list = set()
+
+    def_location = update_moth_taxonomy.get_column_default("Location")
+    def_recorder = update_moth_taxonomy.get_column_default("Recorder")
+    def_trap = update_moth_taxonomy.get_column_default("Trap")
+
+    return template(
+        "options",
+        location_list=location_list,
+        def_location=def_location,
+        recorder_list=recorder_list,
+        def_recorder=def_recorder,
+        trap_list=trap_list,
+        def_trap=def_trap,
+    )
+
+
+@app.post("/add_location")
+def config_add_location():
+    """ Modify the possible locations list
+    """
+    # TODO: Replace horrible global value with an update of the SQL DB
+    global location_list
+    global trap_list
+    global recorder_list
+    try:
+        type(location_list)
+    except NameError:
+        location_list = {}
+    try:
+        type(trap_list)
+    except NameError:
+        trap_list = set()
+    try:
+        type(recorder_list)
+    except NameError:
+        recorder_list = set()
+
+    print(request.forms)
+    new_loc_name = request.forms["new_loc_name"]
+    new_loc_pos = re.sub("/s", "", request.forms["new_loc_pos"])  # Strip any whitespace
+    new_loc_def = request.forms.get("new_loc_def", default=False, type=bool)
+    delete_loc = request.forms.get("delete_loc", default=False, type=bool)
+
+    # Need to validate new_loc_pos is a valid Grid ref
+    print(new_loc_name, new_loc_pos, new_loc_def)
+    location_list[new_loc_name] = new_loc_pos
+
+    if new_loc_def:
+        update_moth_taxonomy.set_column_default("Location", new_loc_name)
+
+    if not new_loc_pos or delete_loc:
+        del location_list[new_loc_name]
+
+    return config_options()
+
+
+@app.post("/add_trap")
+def config_add_trap():
+    """ Modify the possible lamp list
+    """
+    # TODO: Replace horrible global value with an update of the SQL DB
+    global location_list
+    global trap_list
+    global recorder_list
+    try:
+        type(location_list)
+    except NameError:
+        location_list = {}
+    try:
+        type(trap_list)
+    except NameError:
+        trap_list = set()
+    try:
+        type(recorder_list)
+    except NameError:
+        recorder_list = set()
+
+    print(request.forms)
+    new_trap_name = request.forms["new_trap_name"]
+    new_trap_def = request.forms.get("new_trap_def", default=False, type=bool)
+    delete_trap = request.forms.get("delete_trap", default=False, type=bool)
+
+    # Need to validate new_loc_pos is a valid Grid ref
+    trap_list.add(new_trap_name)
+
+    if new_trap_def:
+        update_moth_taxonomy.set_column_default("Trap", new_trap_name)
+
+    if delete_trap:
+        trap_list.discard(new_trap_name)
+
+    return config_options()
+
+
+@app.post("/add_recorder")
+def config_add_recorder():
+    """ Modify the recorder.
+    """
+    # TODO: Replace horrible global value with an update of the SQL DB
+    global location_list
+    global trap_list
+    global recorder_list
+    try:
+        type(location_list)
+    except NameError:
+        location_list = {}
+    try:
+        type(trap_list)
+    except NameError:
+        trap_list = set()
+    try:
+        type(recorder_list)
+    except NameError:
+        recorder_list = set()
+
+    print(request.forms)
+    new_recorder_name = request.forms["new_recorder_name"]
+    new_recorder_def = request.forms.get("new_recorder_def", default=False, type=bool)
+    delete_recorder = request.forms.get("delete_recorder", default=False, type=bool)
+
+    # Need to validate new_loc_pos is a valid Grid ref
+    recorder_list.add(new_recorder_name)
+
+    if new_recorder_def:
+        update_moth_taxonomy.set_column_default("Recorder", new_recorder_name)
+
+    if delete_recorder:
+        recorder_list.discard(new_recorder_name)
+
+    return config_options()
 
 
 if __name__ == "__main__":
