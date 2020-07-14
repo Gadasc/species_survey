@@ -1363,22 +1363,14 @@ def survey_help():
 def config_options():
     """ Configuration page for options
     """
-    # TODO: Replace horrible global value with an update of the SQL DB
-    global location_list
-    global trap_list
-    global recorder_list
-    try:
-        type(location_list)
-    except NameError:
-        location_list = {}
-    try:
-        type(trap_list)
-    except NameError:
-        trap_list = set()
-    try:
-        type(recorder_list)
-    except NameError:
-        recorder_list = set()
+
+    recorder_list = get_table("SELECT * from recorders_list;")["Recorder"].to_list()
+    trap_list = get_table("SELECT * from traps_list;")["Trap"].to_list()
+    location_list = (
+        get_table("SELECT * from locations_list;")
+        .set_index("Name")
+        .to_dict()["OSGB_Grid"]
+    )
 
     def_location = update_moth_taxonomy.get_column_default("Location")
     def_recorder = update_moth_taxonomy.get_column_default("Recorder")
@@ -1399,38 +1391,23 @@ def config_options():
 def config_add_location():
     """ Modify the possible locations list
     """
-    # TODO: Replace horrible global value with an update of the SQL DB
-    global location_list
-    global trap_list
-    global recorder_list
-    try:
-        type(location_list)
-    except NameError:
-        location_list = {}
-    try:
-        type(trap_list)
-    except NameError:
-        trap_list = set()
-    try:
-        type(recorder_list)
-    except NameError:
-        recorder_list = set()
-
     print(request.forms)
     new_loc_name = request.forms["new_loc_name"]
     new_loc_pos = re.sub("/s", "", request.forms["new_loc_pos"])  # Strip any whitespace
     new_loc_def = request.forms.get("new_loc_def", default=False, type=bool)
     delete_loc = request.forms.get("delete_loc", default=False, type=bool)
 
-    # Need to validate new_loc_pos is a valid Grid ref
-    print(new_loc_name, new_loc_pos, new_loc_def)
-    location_list[new_loc_name] = new_loc_pos
+    get_table(f"""DELETE FROM locations_list WHERE Name="{new_loc_name}";""")
+    if not delete_loc:
+        get_table(
+            f"""INSERT INTO locations_list
+                (Name, OSGB_Grid)
+                VALUES
+                ("{new_loc_name}", "{new_loc_pos}");"""
+        )
 
     if new_loc_def:
         update_moth_taxonomy.set_column_default("Location", new_loc_name)
-
-    if not new_loc_pos or delete_loc:
-        del location_list[new_loc_name]
 
     return config_options()
 
@@ -1439,36 +1416,17 @@ def config_add_location():
 def config_add_trap():
     """ Modify the possible lamp list
     """
-    # TODO: Replace horrible global value with an update of the SQL DB
-    global location_list
-    global trap_list
-    global recorder_list
-    try:
-        type(location_list)
-    except NameError:
-        location_list = {}
-    try:
-        type(trap_list)
-    except NameError:
-        trap_list = set()
-    try:
-        type(recorder_list)
-    except NameError:
-        recorder_list = set()
-
     print(request.forms)
     new_trap_name = request.forms["new_trap_name"]
     new_trap_def = request.forms.get("new_trap_def", default=False, type=bool)
     delete_trap = request.forms.get("delete_trap", default=False, type=bool)
 
-    # Need to validate new_loc_pos is a valid Grid ref
-    trap_list.add(new_trap_name)
+    get_table(f"""DELETE FROM traps_list WHERE Trap="{new_trap_name}";""")
+    if not delete_trap:
+        get_table(f"""INSERT INTO traps_list  (Trap) VALUES ("{new_trap_name}");""")
 
-    if new_trap_def:
+    if new_trap_def and not delete_trap:
         update_moth_taxonomy.set_column_default("Trap", new_trap_name)
-
-    if delete_trap:
-        trap_list.discard(new_trap_name)
 
     return config_options()
 
@@ -1477,36 +1435,19 @@ def config_add_trap():
 def config_add_recorder():
     """ Modify the recorder.
     """
-    # TODO: Replace horrible global value with an update of the SQL DB
-    global location_list
-    global trap_list
-    global recorder_list
-    try:
-        type(location_list)
-    except NameError:
-        location_list = {}
-    try:
-        type(trap_list)
-    except NameError:
-        trap_list = set()
-    try:
-        type(recorder_list)
-    except NameError:
-        recorder_list = set()
-
     print(request.forms)
     new_recorder_name = request.forms["new_recorder_name"]
     new_recorder_def = request.forms.get("new_recorder_def", default=False, type=bool)
     delete_recorder = request.forms.get("delete_recorder", default=False, type=bool)
 
-    # Need to validate new_loc_pos is a valid Grid ref
-    recorder_list.add(new_recorder_name)
+    get_table(f'DELETE FROM recorders_list WHERE Recorder="{new_recorder_name}";')
+    if not delete_recorder:
+        get_table(
+            f'INSERT INTO recorders_list  (Recorder) VALUES ("{new_recorder_name}");'
+        )
 
     if new_recorder_def:
         update_moth_taxonomy.set_column_default("Recorder", new_recorder_name)
-
-    if delete_recorder:
-        recorder_list.discard(new_recorder_name)
 
     return config_options()
 

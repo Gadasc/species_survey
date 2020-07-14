@@ -9,7 +9,7 @@ will be (re)written.
 
 History
 -------
-
+14 July 2020 - Added code to add the recorder, location and trap tables
 26 June 2020 - Added indexes
 20 June 2020 - Made sure list going into common_names.js is sorted.
    June 2020 - Genesis
@@ -209,7 +209,12 @@ def get_column_default(col_name):
     """ Encapsulates the retrieval of a column default value
     """
     records_description = get_table("DESCRIBE moth_records;").set_index("Field")
-    return records_description.loc[col_name]["Default"]
+
+    try:
+        rv = records_description.loc[col_name]["Default"]
+    except KeyError:
+        rv = None
+    return rv
 
 
 def update_table_moth_taxonomy():
@@ -226,9 +231,17 @@ def update_table_moth_taxonomy():
     # Ensure additional columns exist - don't set default.
     # If no value set, then it will get automatically updated when the first
     # default is set.
-    get_table("ALTER TABLE moth_records ADD COLUMN IF NOT EXISTS" " Recorder CHAR(50);")
+    get_table("ALTER TABLE moth_records ADD COLUMN IF NOT EXISTS" " Recorder CHAR(30);")
     get_table("ALTER TABLE moth_records ADD COLUMN IF NOT EXISTS" " Trap CHAR(30);")
     get_table("ALTER TABLE moth_records ADD COLUMN IF NOT EXISTS" " Location CHAR(30);")
+
+    # Create supplimentaty tables for Recorders, Traps and Locations.
+    get_table("CREATE TABLE IF NOT EXISTS recorders_list (Recorder CHAR(30) NOT NULL);")
+    get_table("CREATE TABLE IF NOT EXISTS traps_list (Trap CHAR(30) NOT NULL);")
+    get_table(
+        "CREATE TABLE IF NOT EXISTS locations_list "
+        "(Name CHAR(30) NOT NULL, OSGB_Grid CHAR(15));"
+    )
 
     # Main function starts here
     #
