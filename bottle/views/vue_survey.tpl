@@ -203,8 +203,12 @@
         Date: <a class=daynav v-bind:href=yesterday>&#9664;</a>
               <input class="survey_date"  type="date" name="dash_date_str" v-bind:max="get_today_str" v-model:value="this_date" required @change="jumpDate">
               <a class=daynav v-bind:href=tomorrow>&#9654;</a></p>
+              Recorder:  <input list="recorders" name="irecorder" v-model:value="default_recorder" disabled><datalist id="recorders"><option v-for="recorder in recorder_list" v-bind:value="recorder" :key="recorder" /></datalist>
+              Trap: <input list="traps" id="trap" name="itrap" v-model:value="default_trap"><datalist id="traps"><option v-for="trap in trap_list" v-bind:value="trap" :key="trap" /></datalist>
+              Location: <input list="locations" name="ilocation" v-model:value="default_location"><datalist id="locations"><option v-for="loc in location_list" v-bind:value="loc" :key="loc" /></datalist>
+        </p>    
         <table>
-        <thead><tr><th>Species</th><th>Recent</th><th></th><th>Count</th><th></th></tr></thead>
+        <thead><tr><th>Species</th><th>Recent</th><th></th><th>Count</th><th></th><th>L</th><th>R</th><th>T</th></tr></thead>
         <tbody>
             <tr><td colspan="5" style="width: 100%;"><auto-list-box v-on:add-species="add_species" v-bind:current_moths="current_moths"></auto-list-box></td>
             </tr>
@@ -219,8 +223,14 @@
         data: function() {
             return {
                 moths: [],
-                this_date: "{{!dash_date_str}}"
-            }
+                this_date: "{{!dash_date_str}}",
+                default_location: "{{!default_location}}",
+                location_list: {{!location_list}},
+                default_recorder: "{{!default_recorder}}",
+                recorder_list: {{!recorder_list}},
+                default_trap: "{{!default_trap}}",
+                trap_list: {{!trap_list}}
+           }
         },
         methods: {
             add_species: function(new_species){
@@ -239,7 +249,16 @@
                 }
 
                 console.log(new_species);
-                var species_object = {"species": new_species, "recent": 0, "count": 0, "virgin": true, "updated": false,};
+                var species_object = {
+                    "species": new_species, 
+                    "recent": 0, 
+                    "count": 0, 
+                    "virgin": true, 
+                    "updated": false, 
+                    trap: false,
+                    location: false,
+                    recorder: false,
+                };
                 this.moths.unshift(species_object);
 
                 // Add species to sessionStorage
@@ -308,6 +327,9 @@
     manifest_moths.forEach(function(item, index){
             item.virgin = false;
             item.updated = false;
+            item.recorder = false;
+            item.trap = false;
+            item.location = false;
             all_moths.push(item);
         }
     );
@@ -322,6 +344,10 @@
             console.log("Found duplicate record for " + item.species + " at: " + first_match);
             // Update record only if the record is null
             all_moths[first_match].count = item.count;
+            all_moths[first_match].location = item.location;
+            all_moths[first_match].recorder = item.recorder;
+            all_moths[first_match].trap = item.trap;
+
         // else add to list
         } else {
             all_moths.push(item);

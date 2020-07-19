@@ -76,10 +76,11 @@ def update_check():
         pass
 
     if (
-        last_update_date
-        and newest_table_date
+        newest_table_date
         and int(newest_table_date) > int(last_update_date)
-    ) or (newest_table_date and not last_update_date):
+        or newest_table_date
+        and not last_update_date
+    ):
         print("Finally decided to update table")
         print(f"Last update: {last_update_date or 'Never!'}")
         print(f"Latest list: {newest_table_date or 'Not found!'}")
@@ -199,9 +200,13 @@ def update_records(mapfile_name):
 def set_column_default(col_name, def_value):
     """ Encapsulates the methods for updating the column defaults
     """
-
     get_table(
         f"""ALTER TABLE moth_records ALTER {col_name} SET DEFAULT "{def_value}";"""
+    )
+
+    # If any entries are NULL set to defaul
+    get_table(
+        f'UPDATE moth_records SET {col_name}="{def_value}" WHERE  {col_name} IS NULL;'
     )
 
 

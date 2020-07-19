@@ -224,8 +224,8 @@ def log_to_logger(fn):
 
 
 def refresh_manifest(dash_date_str):
-    """ Check the javascript manifest.js file is up to date.
-        dash_date_str is in the form YYYY-MM-DD"""
+    """ The manifest.js file is a list of the most likely moths to be caught
+        along with the number of recently caught speciments."""
 
     # reject singletons in most recent two catches.
     manifest = (
@@ -293,12 +293,12 @@ def generate_records_file(cursor, date_dash_str):
     """
     #   columns = []
     records_df = get_table(
-        f"""SELECT MothName, MothCount FROM moth_records
+        f"""SELECT MothName, MothCount, Location, Recorder, Trap FROM moth_records
             WHERE Date='{date_dash_str}' AND MothName != 'NULL';"""
     )
     records_df["MothName"] = records_df.apply(lambda s: s.replace(" ", "_"))
     records_df.set_index("MothName", inplace=True)
-    records_dict = records_df["MothCount"].to_dict()
+    records_dict = records_df.to_dict(orient="index")
 
     moth_logger.debug(records_dict)
     with open(
@@ -1025,18 +1025,36 @@ def serve_survey2(dash_date_str=None):
             records = json.load(json_in)
             # records is a dict whose keys have been managled " " replaced with "_"
             unmangled_records = [
-                {"species": k.replace("_", " "), "count": int(v), "recent": 0}
+                {
+                    "species": k.replace("_", " "),
+                    "count": int(v["MothCount"]),
+                    "recent": 0,
+                    "location": v["Location"],
+                    "recorder": v["Recorder"],
+                    "trap": v["Trap"],
+                }
                 for k, v in records.items()
             ]
     except FileNotFoundError:
         unmangled_records = []
 
     moth_logger.debug(f"Recent moths:{str(unmangled_records)}")
-    # db.close()
-    # cnx.close()
 
+    recorder_list = get_table("SELECT * from recorders_list;")["Recorder"].to_list()
+    trap_list = get_table("SELECT * from traps_list;")["Trap"].to_list()
+    location_list = (get_table("SELECT Name from locations_list;")["Name"]).tolist()
+    print("LOCATION LIST")
+    print(location_list)
     return template(
-        "vue_survey.tpl", records=unmangled_records, dash_date_str=dash_date_str
+        "vue_survey.tpl",
+        records=unmangled_records,
+        dash_date_str=dash_date_str,
+        default_trap=update_moth_taxonomy.get_column_default("Trap"),
+        trap_list=trap_list,
+        default_recorder=update_moth_taxonomy.get_column_default("Recorder"),
+        recorder_list=recorder_list,
+        default_location=update_moth_taxonomy.get_column_default("Location"),
+        location_list=location_list,
     )
 
 
@@ -1242,6 +1260,8 @@ def show_latest():
 def survey_handler():
     """ Handler to manage the data returned from the survey sheet. """
     #    today_string = dt.datetime.now()
+    print("SUBMIT VALUES FROM SURVEY")
+    print({k: v for k, v in request.forms.items()})
     date_string = request.forms["dash_date_str"]
     fout_json = (
         cfg["RECORDS_PATH"] + "day_count_" + date_string.replace("-", "") + ".json"
@@ -1306,17 +1326,13 @@ def export_data(dl_year, dl_month=None):
 
     month_option = f" AND Month(Date)={dl_month}" if dl_month else ""
     query_string = f"""SELECT mr.Date, CONCAT(mt.MothGenus, " ", mt.MothSpecies) Species,
-        mr.MothCount Quantity,
-        CONCAT("Lamp used: ",mr.Lamp, "\nCommon Name: ", mt.MothName) Comment
+        mr.MothCount Quantity, mr.OSGB_Grid GridRef, mr.Recorder "Recorder Name"
+        CONCAT("Lamp Trap: ",mr.Trap, "\nCommon Name: ", mt.MothName) Comment
         FROM (select * FROM moth_records WHERE Year(Date)={dl_year} {month_option}) mr
         JOIN {cfg["TAXONOMY_TABLE"]} mt ON mr.MothName=mt.MothName;"""
 
     moth_logger.debug(query_string)
     export_data = get_table(query_string)
-
-    # Add data for iRecord
-    export_data["GridRef"] = "SU5120569500"
-    export_data["Recorder Name"] = "Gareth Scourfield"
 
     return template(export_data.loc[export_data["Quantity"] != 0].to_csv(index=False))
 
@@ -1393,7 +1409,7 @@ def config_add_location():
     """
     print(request.forms)
     new_loc_name = request.forms["new_loc_name"]
-    new_loc_pos = re.sub("/s", "", request.forms["new_loc_pos"])  # Strip any whitespace
+    new_loc_pos = re.sub(r"\s", "", request.forms["new_loc_pos"])  # Strip whitespace
     new_loc_def = request.forms.get("new_loc_def", default=False, type=bool)
     delete_loc = request.forms.get("delete_loc", default=False, type=bool)
 
