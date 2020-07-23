@@ -46,14 +46,17 @@
 
     Vue.component('moth-entry', {
         template: `<tr v-bind:class="{'virgin' : isVirgin, 'updated': isUpdated, 'flash': flash_flag}" :id="uriSpecies">
-                   <td>\{\{moth_record.species\}\}</td>
-                   <td class="recent">\{\{moth_record.recent\}\}</td>
+                   <td>\{\{moth_record.species\}\}<input type="hidden" v-bind:name="moth_record.species" v-model="safeJSONMothObject"></td>
                    <td><button class="round_button" v-on:click.prevent='decrement'>-</button></td>
-                   <td class="count" ><input v-bind:name="moth_record.species" v-model="moth_record.count"></td>
+                   <td class="count"><input class="col_count" v-model="moth_record.count"></td>
                    <td><button class="round_button" v-on:click.prevent="increment">+</button></td>
+                   <td class="recent">\{\{moth_record.recent\}\}</td>
+                   <td><sample-detail :sampleDetail="moth_record.recorder" :defaultDetail="default_recorder" /></td>
+                   <td><sample-detail :sampleDetail="moth_record.trap" :defaultDetail="default_trap" /></td>
+                   <td><sample-detail :sampleDetail="moth_record.location" :defaultDetail="default_location" /></td>
                    </tr>
                    `,
-        props: ['moth_record'],
+        props: ['moth_record', 'default_location', 'default_trap', 'default_recorder'],
         data: function(){
             return {
                 flash_flag: false
@@ -89,6 +92,9 @@
             },
             uriSpecies: function(){
                 return encodeURI(this.moth_record.species);
+            },
+            safeJSONMothObject: function(){
+                return JSON.stringify(this.moth_record);
             }
         }
     })
@@ -195,6 +201,26 @@
         }
     })
 
+    Vue.component("sample-detail", {
+        template: `
+            <span :class="{'def_detail' : isDefDetail}"> \{\{ myAbbrev \}\}</span> 
+        `,
+        props: ["defaultDetail", "sampleDetail"],
+        computed: {
+            myDetail: function() {
+                return this.sampleDetail ? this.sampleDetail : this.defaultDetail;
+            },
+            isDefDetail: function() {
+                return this.sampleDetail == false;
+            },
+            myAbbrev: function(){
+                return this.myDetail.replace(/[^A-Z]/g, "");
+            }
+
+        }
+    })
+
+
     vm = new Vue({
         el: '#app',
         template: `    
@@ -202,20 +228,25 @@
         <form id="mothsForm" autocomplete="on" action="/handle_survey" method="post" v-on:keydown.enter.prevent>
         Date: <a class=daynav v-bind:href=yesterday>&#9664;</a>
               <input class="survey_date"  type="date" name="dash_date_str" v-bind:max="get_today_str" v-model:value="this_date" required @change="jumpDate">
-              <a class=daynav v-bind:href=tomorrow>&#9654;</a></p>
-              Recorder:  <input list="recorders" name="irecorder" v-model:value="default_recorder" disabled><datalist id="recorders"><option v-for="recorder in recorder_list" v-bind:value="recorder" :key="recorder" /></datalist>
-              Trap: <input list="traps" id="trap" name="itrap" v-model:value="default_trap"><datalist id="traps"><option v-for="trap in trap_list" v-bind:value="trap" :key="trap" /></datalist>
-              Location: <input list="locations" name="ilocation" v-model:value="default_location"><datalist id="locations"><option v-for="loc in location_list" v-bind:value="loc" :key="loc" /></datalist>
+              <a class=daynav v-bind:href=tomorrow>&#9654;</a><button type="submit">Submit</button></p>
         </p>    
         <table>
-        <thead><tr><th>Species</th><th>Recent</th><th></th><th>Count</th><th></th><th>L</th><th>R</th><th>T</th></tr></thead>
+        <thead><tr><th>Species</th><th></th><th class="col_count">Count</th><th></th><th>Recent</th><th>Rec</th><th>Trap</th><th>Loc</th></tr></thead>
         <tbody>
-            <tr><td colspan="5" style="width: 100%;"><auto-list-box v-on:add-species="add_species" v-bind:current_moths="current_moths"></auto-list-box></td>
+            <tr><td colspan="8" style="width: 100%;"><auto-list-box v-on:add-species="add_species" v-bind:current_moths="current_moths"></auto-list-box></td>
             </tr>
-            <moth-entry v-for="moth in moths" v-bind:key='moth.species' v-bind:moth_record='moth' :ref='moth.species' />
+            <moth-entry v-for="moth in moths" v-bind:key='moth.species' v-bind:moth_record='moth' :default_location='default_location' :default_recorder='default_recorder' :default_trap='default_trap' :ref='moth.species' />
         </tbody>
         </table>
-        <button type="submit">Submit</button>
+        </p>
+        <div style="display: inline-block;">
+        <ul class="detail_list"><strong>Defaults</strong>
+        <li><span class="detail_title">Recorder:</span><input list="recorders" name="irecorder" v-model:value="default_recorder"><datalist id="recorders"><option v-for="recorder in recorder_list" v-bind:value="recorder" :key="recorder" /></datalist></li>
+        <li><span class="detail_title">Trap:</span><input list="traps" id="trap" name="itrap" v-model:value="default_trap"><datalist id="traps"><option v-for="trap in trap_list" v-bind:value="trap" :key="trap" /></datalist></li>
+        <li><span class="detail_title">Location:</span><input list="locations" name="ilocation" v-model:value="default_location"><datalist id="locations"><option v-for="loc in location_list" v-bind:value="loc" :key="loc" /></datalist></li>
+        </ul>
+        </div>
+        <button type="submit">Submit</button></p>
         </form>
         </div>
         `,

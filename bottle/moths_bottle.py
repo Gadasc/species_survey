@@ -232,6 +232,7 @@ def refresh_manifest(dash_date_str):
         get_table(
             f"""SELECT MothName species, Date, SUM(MothCount) recent
             FROM moth_records WHERE
+            MothName != "None" AND
             Date > DATE_ADD(DATE("{dash_date_str}"), INTERVAL -7 DAY) AND
             Date <= DATE("{dash_date_str}") GROUP BY Date, species;"""
         )
@@ -275,13 +276,22 @@ def update_moth_database(cursor, sql_date_string, dict_records):
     else:
         # add updates
         ins_list = [
-            '("{}", "{}", {})'.format(sql_date_string, k.replace("_", " "), v)
+            '("{}", "{}", {}, "{}", "{}", "{}")'.format(
+                sql_date_string,
+                k.replace("_", " "),
+                v["count"],
+                v["location"],
+                v["recorder"],
+                v["trap"],
+            )
             for k, v in dict_records.items()
+            if k != "nan" and v["count"] > 0
         ]
 
         ins_string = ", ".join(ins_list)
         cursor.execute(
-            "INSERT INTO moth_records (Date, MothName, MothCount) VALUES {};".format(
+            "INSERT INTO moth_records "
+            "(Date, MothName, MothCount, Location, Recorder, Trap) VALUES {};".format(
                 ins_string
             )
         )
@@ -293,11 +303,12 @@ def generate_records_file(cursor, date_dash_str):
     """
     #   columns = []
     records_df = get_table(
-        f"""SELECT MothName, MothCount, Location, Recorder, Trap FROM moth_records
+        f"""SELECT MothName species, MothCount count,
+            Location location, Recorder recorder, Trap trap FROM moth_records
             WHERE Date='{date_dash_str}' AND MothName != 'NULL';"""
     )
-    records_df["MothName"] = records_df.apply(lambda s: s.replace(" ", "_"))
-    records_df.set_index("MothName", inplace=True)
+    records_df["species"] = records_df.apply(lambda s: s.replace(" ", "_"))
+    records_df.set_index("species", inplace=True)
     records_dict = records_df.to_dict(orient="index")
 
     moth_logger.debug(records_dict)
@@ -405,8 +416,6 @@ def get_moth_grid(db):
                     GROUP BY Year, Month, MothName
             ) tw
         GROUP BY Year, Month, MothName;"""
-    # species_df = get_table(sql_species_name_by_month_year)
-    # species_df.set_index(list(species_df.columns))
 
     db.execute(sql_species_name_by_month_year)
     data_list = [list(c) for c in db]
@@ -1012,6 +1021,8 @@ def serve_survey2(dash_date_str=None):
         # generate day_count_YYYYMMDD.json file to later recover the records.
         generate_records_file(None, dash_date_str)
     else:
+        # Otherwise assume the file exists
+        # Create today's dat_date_str
         dash_date_str = dt.date.today().strftime("%Y-%m-%d")
 
     # This creates a manifest file which shows possible catches.
@@ -1027,11 +1038,11 @@ def serve_survey2(dash_date_str=None):
             unmangled_records = [
                 {
                     "species": k.replace("_", " "),
-                    "count": int(v["MothCount"]),
+                    "count": int(v["count"]),
                     "recent": 0,
-                    "location": v["Location"],
-                    "recorder": v["Recorder"],
-                    "trap": v["Trap"],
+                    "location": v["location"],
+                    "recorder": v["recorder"],
+                    "trap": v["trap"],
                 }
                 for k, v in records.items()
             ]
@@ -1259,27 +1270,46 @@ def show_latest():
 @app.post("/handle_survey")
 def survey_handler():
     """ Handler to manage the data returned from the survey sheet. """
-    #    today_string = dt.datetime.now()
     print("SUBMIT VALUES FROM SURVEY")
-    print({k: v for k, v in request.forms.items()})
+    for k, v in request.forms.items():
+        try:
+            print(k, json.loads(v))
+        except json.decoder.JSONDecodeError:
+            print(k, v)
+
     date_string = request.forms["dash_date_str"]
+    default_recorder = request.forms["irecorder"]
+    default_trap = request.forms["itrap"]
+    default_location = request.forms["ilocation"]
+
     fout_json = (
         cfg["RECORDS_PATH"] + "day_count_" + date_string.replace("-", "") + ".json"
     )
 
-    rs = []
     results_dict = {}
     for moth in request.forms.keys():
-        if moth == "dash_date_str":
+        if moth in ["dash_date_str", "irecorder", "ilocation", "itrap"]:
             continue
-        specimens = request.forms.get(
-            moth, default=0, index=0, type=int
-        )  # leave result as string
-        if specimens:
-            rs.append(f"<p><strong>{moth}</strong>      {specimens}</p>")
-            # replace spaces for backward compate
-            # TO DO - can we remove name mangling
-            results_dict[moth] = str(specimens).replace(" ", "_")
+        specimens = json.loads((request.forms.get(moth)))
+        if specimens["count"] <= 0:
+            continue
+        print(">>>>>>>>>>>>")
+        print(type(specimens))
+        print(specimens)
+        print(">>>>>>>>>>>>")
+        specimens["recorder"] = specimens["recorder"] or default_recorder
+        specimens["trap"] = specimens["trap"] or default_trap
+        specimens["location"] = specimens["location"] or default_location
+        results_dict[moth] = specimens
+
+        # specimens = request.forms.get(
+        #     moth, default=0, index=0, type=int
+        # )  # leave result as string
+
+        # if specimens:
+        #     # replace spaces for backward compate
+        #     # TO DO - can we remove name mangling
+        #     results_dict[moth] = str(specimens).replace(" ", "_")
 
     # Store results locally  so when survey sheet is recalled it will auto populate
     # This probably isn't really required as we can access the SQL quickly
@@ -1301,8 +1331,8 @@ def survey_handler():
         rsp = show_latest()
     else:
         rsp = serve_survey2((page_date + dt.timedelta(days=1)).strftime("%Y-%m-%d"))
-    # Set the a cookie "delete_cache_date" to remove local stored data which woul
-    # over write data if edited on another machine. So we want to delete this
+    # Set the a cookie "delete_cache_date" to remove local stored data which would
+    # overwrite data if edited on another machine. So we want to delete this
     # data on a successful submission. The tpl files must handle this and clear
     # the cookie. This won't handle stale data on one machine from overwriting update
     # but that is an unlikely edge case.
@@ -1326,10 +1356,12 @@ def export_data(dl_year, dl_month=None):
 
     month_option = f" AND Month(Date)={dl_month}" if dl_month else ""
     query_string = f"""SELECT mr.Date, CONCAT(mt.MothGenus, " ", mt.MothSpecies) Species,
-        mr.MothCount Quantity, mr.OSGB_Grid GridRef, mr.Recorder "Recorder Name"
-        CONCAT("Lamp Trap: ",mr.Trap, "\nCommon Name: ", mt.MothName) Comment
+        mr.MothCount Quantity, ll.OSGB_Grid GridRef, mr.Recorder "Recorder Name",
+        CONCAT("Lamp Trap: ", mr.Trap, "\nCommon Name: ", mt.MothName,
+            "\nLocation Name: ", mr.Location) Comment
         FROM (select * FROM moth_records WHERE Year(Date)={dl_year} {month_option}) mr
-        JOIN {cfg["TAXONOMY_TABLE"]} mt ON mr.MothName=mt.MothName;"""
+        JOIN (SELECT * FROM {cfg["TAXONOMY_TABLE"]}) mt ON mr.MothName=mt.MothName
+        JOIN (SELECT * FROM locations_list) ll ON ll.Name=mr.Location;"""
 
     moth_logger.debug(query_string)
     export_data = get_table(query_string)

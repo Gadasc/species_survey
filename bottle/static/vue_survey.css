@@ -85,11 +85,14 @@ input[type=submit] {
   background-color:  #b9c9df;
   font: inherit;
   color: #fff;
+  font: 36px Arial;
+  float: right;
 }
 
 button {
-  font-size: 64px;
+  font-size: 32px;
   touch-action: manipulation;
+  float: right;
 }
 
 input[type=button] {
@@ -145,6 +148,10 @@ table, th, tr {
   empty-cells: show;
 }
 
+th {
+  padding: 0px 10px;
+}
+
 tr:nth-child(even) {background-color: #f2f2f2}
 
 .daynav {
@@ -170,4 +177,28 @@ tr:nth-child(even) {background-color: #f2f2f2}
 @keyframes myflash {
   from {background-color: #7092be;}
 /*  to {background-color: initial;} */
+}
+
+.def_detail {
+  color: #888;
+}
+
+.col_count {
+  width: 100px;
+  text-align: center;
+}
+
+.detail_list {
+  list-style: none;
+  padding-inline-start: 20px;
+  margin-block-start: 10px;
+}
+
+.detail_title {
+  width: 170px;
+  display: inline-block;
+}
+
+#mothsForm {
+  display: inline-block;
 }
