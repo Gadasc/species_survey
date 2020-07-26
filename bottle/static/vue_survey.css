@@ -68,7 +68,6 @@ input[list]:disabled {
   color: #ccc;
 }
 
-
 input {
   border: 1px solid transparent;
   background-color: inherit;
@@ -80,6 +79,17 @@ input {
   color: inherit;
 }
 
+
+select {
+  border: 1px solid transparent;
+  background-color: transparent;
+  padding: 0px;
+  word-wrap: break-word;
+  /*width: 100%;*/ 
+  padding: 0px;
+  font: 36px Arial;
+  color: inherit;
+}
 
 input[type=submit] {
   background-color:  #b9c9df;

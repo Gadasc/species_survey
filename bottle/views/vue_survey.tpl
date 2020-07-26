@@ -51,12 +51,12 @@
                    <td class="count"><input class="col_count" v-model="moth_record.count"></td>
                    <td><button class="round_button" v-on:click.prevent="increment">+</button></td>
                    <td class="recent">\{\{moth_record.recent\}\}</td>
-                   <td><sample-detail :sampleDetail="moth_record.recorder" :defaultDetail="default_recorder" /></td>
-                   <td><sample-detail :sampleDetail="moth_record.trap" :defaultDetail="default_trap" /></td>
-                   <td><sample-detail :sampleDetail="moth_record.location" :defaultDetail="default_location" /></td>
+                   <td><sample-detail :sampleDetail="moth_record.recorder" :detailOptions="detail_options.Recorder" /></td>
+                   <td><sample-detail :sampleDetail="moth_record.trap" :detailOptions="detail_options.Trap" /></td>
+                   <td><sample-detail :sampleDetail="moth_record.location" :detailOptions="detail_options.Location" /></td>
                    </tr>
                    `,
-        props: ['moth_record', 'default_location', 'default_trap', 'default_recorder'],
+        props: ['moth_record', 'detail_options'],
         data: function(){
             return {
                 flash_flag: false
@@ -201,23 +201,62 @@
         }
     })
 
+    /*
+    <select :name="option_name" v-bind:value="value" v-on:change="on_select">
+                        <option v-for="opt in option_config.list" v-bind:value="opt" :key="opt.name">\{\{opt\}\}</option>
+    </select>
+    */
+    /*<span "> \{\{ myAbbrev \}\}</span> */
+
+
     Vue.component("sample-detail", {
         template: `
-            <span :class="{'def_detail' : isDefDetail}"> \{\{ myAbbrev \}\}</span> 
+            <select :class="{'def_detail' : isDefDetail}" v-bind:value="myDetail" >
+                <option v-for="opt in detailOptions.list" :value="opt" :key="opt">
+                    \{\{ dispAbbrev( opt ) \}\}
+                </option>
+            </select>
         `,
-        props: ["defaultDetail", "sampleDetail"],
+        props: ["detailOptions", "sampleDetail"],
         computed: {
             myDetail: function() {
-                return this.sampleDetail ? this.sampleDetail : this.defaultDetail;
+                return this.sampleDetail ? this.sampleDetail : this.detailOptions.default;
             },
             isDefDetail: function() {
                 return this.sampleDetail == false;
             },
             myAbbrev: function(){
                 return this.myDetail.replace(/[^A-Z]/g, "");
+            },
+        },
+        methods: {
+            dispAbbrev: function(fullText){
+                return fullText.replace(/[^A-Z]/g, "");
             }
 
         }
+    })
+
+    Vue.component("page-option", {
+        template: `<li>
+                     <span class="detail_title">\{\{option_config.name\}\}: </span>
+                     <select :name="option_name" v-bind:value="value" v-on:change="on_select">
+                        <option v-for="opt in option_config.list" v-bind:value="opt" :key="opt.name">\{\{opt\}\}</option>
+                     </select>
+                    </li>`,
+        props: ['option_config', 'value'],
+        computed: {
+            option_name: function(){
+                return "option_"+this.option_config.name;
+            },
+        },
+        methods: {
+            on_select: function(event){
+                console.log("changed default", event.target.value);
+                this.$emit('change', {name: this.option_config.name, value: event.target.value});
+            }
+        }
+
     })
 
 
@@ -235,15 +274,13 @@
         <tbody>
             <tr><td colspan="8" style="width: 100%;"><auto-list-box v-on:add-species="add_species" v-bind:current_moths="current_moths"></auto-list-box></td>
             </tr>
-            <moth-entry v-for="moth in moths" v-bind:key='moth.species' v-bind:moth_record='moth' :default_location='default_location' :default_recorder='default_recorder' :default_trap='default_trap' :ref='moth.species' />
+            <moth-entry v-for="moth in moths" v-bind:key='moth.species' v-bind:moth_record='moth' :detail_options='detail_options' :ref='moth.species' />
         </tbody>
         </table>
         </p>
         <div style="display: inline-block;">
         <ul class="detail_list"><strong>Defaults</strong>
-        <li><span class="detail_title">Recorder:</span><input list="recorders" name="irecorder" v-model:value="default_recorder"><datalist id="recorders"><option v-for="recorder in recorder_list" v-bind:value="recorder" :key="recorder" /></datalist></li>
-        <li><span class="detail_title">Trap:</span><input list="traps" id="trap" name="itrap" v-model:value="default_trap"><datalist id="traps"><option v-for="trap in trap_list" v-bind:value="trap" :key="trap" /></datalist></li>
-        <li><span class="detail_title">Location:</span><input list="locations" name="ilocation" v-model:value="default_location"><datalist id="locations"><option v-for="loc in location_list" v-bind:value="loc" :key="loc" /></datalist></li>
+        <page-option v-for="oc in detail_options" :option_config="oc" :key="oc.name" v-model:value="oc.default" v-on:change="detailHandler" />
         </ul>
         </div>
         <button type="submit">Submit</button></p>
@@ -255,12 +292,11 @@
             return {
                 moths: [],
                 this_date: "{{!dash_date_str}}",
-                default_location: "{{!default_location}}",
-                location_list: {{!location_list}},
-                default_recorder: "{{!default_recorder}}",
-                recorder_list: {{!recorder_list}},
-                default_trap: "{{!default_trap}}",
-                trap_list: {{!trap_list}}
+                detail_options: {
+                    "Location": {name: "Location", list: {{!location_list}}, default: "{{!default_location}}"},
+                    "Recorder": {name: "Recorder", list: {{!recorder_list}}, default: "{{!default_recorder}}"},
+                    "Trap": {name: "Trap", list: {{!trap_list}}, default: "{{!default_trap}}"}
+                },
            }
         },
         methods: {
@@ -311,6 +347,11 @@
             jumpDate: function(){
                 console.log("Date picker", this.this_date);
                 window.location.href = "/survey/" + this.this_date;
+            },
+            detailHandler: function(event){
+                console.log("Recevied event", event)
+                this.detail_options[event.name].default = event.value;
+
             }
         },
         computed: {
@@ -341,7 +382,8 @@
 
                     today_str = yyyy + '-' + mm + '-' + dd;
                     return today_str;
-            }
+            },
+            
         }
         
         

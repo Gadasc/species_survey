@@ -1278,9 +1278,9 @@ def survey_handler():
             print(k, v)
 
     date_string = request.forms["dash_date_str"]
-    default_recorder = request.forms["irecorder"]
-    default_trap = request.forms["itrap"]
-    default_location = request.forms["ilocation"]
+    default_recorder = request.forms["option_Recorder"]
+    default_trap = request.forms["option_Trap"]
+    default_location = request.forms["option_Location"]
 
     fout_json = (
         cfg["RECORDS_PATH"] + "day_count_" + date_string.replace("-", "") + ".json"
@@ -1288,7 +1288,12 @@ def survey_handler():
 
     results_dict = {}
     for moth in request.forms.keys():
-        if moth in ["dash_date_str", "irecorder", "ilocation", "itrap"]:
+        if moth in [
+            "dash_date_str",
+            "option_Recorder",
+            "option_Location",
+            "option_Trap",
+        ]:
             continue
         specimens = json.loads((request.forms.get(moth)))
         if specimens["count"] <= 0:
