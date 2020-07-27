@@ -43,6 +43,12 @@
             `,
         props:['record']
     })
+/*
+<td><sample-detail :sampleDetail="moth_record.trap" :detailOptions="detail_options.Trap" v-on:detail-change="detail_change" /></td>
+                   <td><sample-detail :sampleDetail="moth_record.location" :detailOptions="detail_options.Location" v-on:detail-change="detail_change" /></td>
+                   
+*/
+
 
     Vue.component('moth-entry', {
         template: `<tr v-bind:class="{'virgin' : isVirgin, 'updated': isUpdated, 'flash': flash_flag}" :id="uriSpecies">
@@ -51,9 +57,15 @@
                    <td class="count"><input class="col_count" v-model="moth_record.count"></td>
                    <td><button class="round_button" v-on:click.prevent="increment">+</button></td>
                    <td class="recent">\{\{moth_record.recent\}\}</td>
-                   <td><sample-detail :sampleDetail="moth_record.recorder" :detailOptions="detail_options.Recorder" /></td>
-                   <td><sample-detail :sampleDetail="moth_record.trap" :detailOptions="detail_options.Trap" /></td>
-                   <td><sample-detail :sampleDetail="moth_record.location" :detailOptions="detail_options.Location" /></td>
+                   
+                   <sample-detail 
+                        v-for="opt in detail_options" 
+                        :sampleDetail="moth_record[opt.name.toLowerCase()]" 
+                        :detailOptions="opt" 
+                        v-on:detail-change="detail_change" 
+                        :key="opt.name"
+                        :hidden="opt.hidden"
+                    />
                    </tr>
                    `,
         props: ['moth_record', 'detail_options'],
@@ -81,7 +93,15 @@
             },
             setFlashFlag: function(bval){
                 this.flash_flag = bval;
+            },
+            detail_change: function(event){
+                /* An optional detail changed - reflect in moth details */
+                console.log("Updating details for: ", this.moth_record.species, " ", event.name, "=>", event.value);
+                this.moth_record[event.name.toLowerCase()] = event.value;
+                this.moth_record.updated = true;
+                cache_update_species(this.moth_record);
             }
+
         },
         computed: {
             isVirgin: function(){
@@ -201,21 +221,16 @@
         }
     })
 
-    /*
-    <select :name="option_name" v-bind:value="value" v-on:change="on_select">
-                        <option v-for="opt in option_config.list" v-bind:value="opt" :key="opt.name">\{\{opt\}\}</option>
-    </select>
-    */
-    /*<span "> \{\{ myAbbrev \}\}</span> */
-
 
     Vue.component("sample-detail", {
         template: `
-            <select :class="{'def_detail' : isDefDetail}" v-bind:value="myDetail" >
+            <td>
+            <select :class="{'def_detail' : isDefDetail}" v-bind:value="myDetail" v-on:change="on_select">
                 <option v-for="opt in detailOptions.list" :value="opt" :key="opt">
                     \{\{ dispAbbrev( opt ) \}\}
                 </option>
             </select>
+            </td>
         `,
         props: ["detailOptions", "sampleDetail"],
         computed: {
@@ -232,6 +247,10 @@
         methods: {
             dispAbbrev: function(fullText){
                 return fullText.replace(/[^A-Z]/g, "");
+            },
+            on_select: function(event){
+                console.log("Over-ridden default with", event.target.value);
+                this.$emit('detail-change', {name: this.detailOptions.name, value: event.target.value});
             }
 
         }
@@ -239,12 +258,19 @@
 
     Vue.component("page-option", {
         template: `<li>
-                     <span class="detail_title">\{\{option_config.name\}\}: </span>
-                     <select :name="option_name" v-bind:value="value" v-on:change="on_select">
+                    <input type="checkbox" v-model:value="option_config.hidden"  :true-value="myfalse" :false-value="mytrue"/> 
+                    <span class="detail_title">\{\{option_config.name\}\}: </span>
+                    <select :name="option_name" v-bind:value="value" v-on:change="on_select">
                         <option v-for="opt in option_config.list" v-bind:value="opt" :key="opt.name">\{\{opt\}\}</option>
                      </select>
                     </li>`,
         props: ['option_config', 'value'],
+        data: function(){
+            return {
+                myfalse: false,
+                mytrue: true
+            }
+        },
         computed: {
             option_name: function(){
                 return "option_"+this.option_config.name;
@@ -254,7 +280,14 @@
             on_select: function(event){
                 console.log("changed default", event.target.value);
                 this.$emit('change', {name: this.option_config.name, value: event.target.value});
-            }
+            },
+            /*set_visibility: function(event){
+                console.log("Visibility (",this.option_config.name,"): ",event.target.value);
+                this.is_visible = (this.is_visible == false);
+                this.$emit('change_viz', {name: this.option_config.name, value: event.target.value});
+
+
+            }*/
         }
 
     })
@@ -270,7 +303,8 @@
               <a class=daynav v-bind:href=tomorrow>&#9654;</a><button type="submit">Submit</button></p>
         </p>    
         <table>
-        <thead><tr><th>Species</th><th></th><th class="col_count">Count</th><th></th><th>Recent</th><th>Rec</th><th>Trap</th><th>Loc</th></tr></thead>
+        <thead><tr><th>Species</th><th></th><th class="col_count">Count</th><th></th><th>Recent</th>
+            <th v-for="oc in detail_options" :hidden="oc.hidden" >\{\{ oc.column_hdr \}\}</th></tr></thead>
         <tbody>
             <tr><td colspan="8" style="width: 100%;"><auto-list-box v-on:add-species="add_species" v-bind:current_moths="current_moths"></auto-list-box></td>
             </tr>
@@ -293,9 +327,9 @@
                 moths: [],
                 this_date: "{{!dash_date_str}}",
                 detail_options: {
-                    "Location": {name: "Location", list: {{!location_list}}, default: "{{!default_location}}"},
-                    "Recorder": {name: "Recorder", list: {{!recorder_list}}, default: "{{!default_recorder}}"},
-                    "Trap": {name: "Trap", list: {{!trap_list}}, default: "{{!default_trap}}"}
+                    "Location": {name: "Location", list: {{!location_list}}, default: "{{!default_location}}", column_hdr: "Loc", hidden: false},
+                    "Recorder": {name: "Recorder", list: {{!recorder_list}}, default: "{{!default_recorder}}", column_hdr: "Rec", hidden: true},
+                    "Trap": {name: "Trap", list: {{!trap_list}}, default: "{{!default_trap}}", column_hdr: "Trap", hidden: true}
                 },
            }
         },
