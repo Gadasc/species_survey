@@ -79,6 +79,11 @@ input {
   color: inherit;
 }
 
+input[type="checkbox"] {
+  transform: scale(2);
+  vertical-align: middle;
+  width: 30px;
+}
 
 select {
   border: 1px solid transparent;

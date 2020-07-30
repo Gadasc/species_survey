@@ -25,9 +25,6 @@
         sessionStorage.removeItem(dash_date_string);
         document.cookie = "delete_cache_date=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
     }
-</script>
-
-<script>
 
     // Helper functions to store updates in sessionStorage until successfully commited.
     // This protects against accidentally leaving the page, or network failures.
@@ -36,18 +33,19 @@
         sessionStorage.setItem("{{!dash_date_str}}", JSON.stringify(record_cache));
     }
 
- 
+    function cache_update_detail_options(detail_obj){
+        // Finally recover details
+        console.log("Updating details")
+        sessionStorage.setItem("detail_cache", JSON.stringify(detail_obj));
+    }
+
+
     Vue.component('table-row', {
         template: `
             <tr><td>\{\{record.species\}\}</td></tr>
             `,
         props:['record']
     })
-/*
-<td><sample-detail :sampleDetail="moth_record.trap" :detailOptions="detail_options.Trap" v-on:detail-change="detail_change" /></td>
-                   <td><sample-detail :sampleDetail="moth_record.location" :detailOptions="detail_options.Location" v-on:detail-change="detail_change" /></td>
-                   
-*/
 
 
     Vue.component('moth-entry', {
@@ -281,13 +279,6 @@
                 console.log("changed default", event.target.value);
                 this.$emit('change', {name: this.option_config.name, value: event.target.value});
             },
-            /*set_visibility: function(event){
-                console.log("Visibility (",this.option_config.name,"): ",event.target.value);
-                this.is_visible = (this.is_visible == false);
-                this.$emit('change_viz', {name: this.option_config.name, value: event.target.value});
-
-
-            }*/
         }
 
     })
@@ -322,16 +313,22 @@
         </div>
         `,
        
-        data: function() {
-            return {
+        data: {
                 moths: [],
                 this_date: "{{!dash_date_str}}",
                 detail_options: {
-                    "Location": {name: "Location", list: {{!location_list}}, default: "{{!default_location}}", column_hdr: "Loc", hidden: false},
+                    "Location": {name: "Location", list: {{!location_list}}, default: "{{!default_location}}", column_hdr: "Loc", hidden: true},
                     "Recorder": {name: "Recorder", list: {{!recorder_list}}, default: "{{!default_recorder}}", column_hdr: "Rec", hidden: true},
                     "Trap": {name: "Trap", list: {{!trap_list}}, default: "{{!default_trap}}", column_hdr: "Trap", hidden: true}
+                }
+        },
+        watch: {
+            detail_options: {
+                handler(val) {
+                    cache_update_detail_options(val);
                 },
-           }
+                deep: true
+            }
         },
         methods: {
             add_species: function(new_species){
@@ -491,6 +488,14 @@
     
     // Finally inject into the app
     vm.moths = all_moths;      
+
+    // Finally recover details
+    var detail_cache = JSON.parse(sessionStorage.getItem("detail_cache"));
+    if (detail_cache != null){
+        vm.detail_options = detail_cache;
+    }
+
+
 
 </script>
 
