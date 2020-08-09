@@ -36,7 +36,7 @@
     function cache_update_detail_options(detail_obj){
         // Finally recover details
         console.log("Updating details")
-        sessionStorage.setItem("detail_cache", JSON.stringify(detail_obj));
+        localStorage.setItem("detail_cache", JSON.stringify(detail_obj));
     }
 
 
@@ -489,11 +489,22 @@
     // Finally inject into the app
     vm.moths = all_moths;      
 
-    // Finally recover details
-    var detail_cache = JSON.parse(sessionStorage.getItem("detail_cache"));
+    // Finally recover visibility details
+    var detail_cache = JSON.parse(localStorage.getItem("detail_cache"));
     if (detail_cache != null){
-        vm.detail_options = detail_cache;
+        /* vm.detail_options = detail_cache;
+        */
+        Object.entries(detail_cache).forEach(function(item, index){
+            console.log("Cache item", item);
+            option_name = item[0];
+            hidden = item[1].hidden;
+            console.log("Recover vis:", option_name, ": ", hidden);
+            if (hidden === false){
+                vm.detail_options[option_name].hidden = item[1].hidden;
+            }
+       })
     }
+    
 
 
 

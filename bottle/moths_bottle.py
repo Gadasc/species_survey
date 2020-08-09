@@ -1053,19 +1053,19 @@ def serve_survey2(dash_date_str=None):
 
     recorder_list = get_table("SELECT * from recorders_list;")["Recorder"].to_list()
     trap_list = get_table("SELECT * from traps_list;")["Trap"].to_list()
-    location_list = (get_table("SELECT Name from locations_list;")["Name"]).tolist()
+    location_list = get_table("SELECT Name from locations_list;")["Name"].to_list()
     print("LOCATION LIST")
     print(location_list)
     return template(
         "vue_survey.tpl",
         records=unmangled_records,
         dash_date_str=dash_date_str,
+        default_location=update_moth_taxonomy.get_column_default("Location"),
+        location_list=location_list,
         default_trap=update_moth_taxonomy.get_column_default("Trap"),
         trap_list=trap_list,
         default_recorder=update_moth_taxonomy.get_column_default("Recorder"),
         recorder_list=recorder_list,
-        default_location=update_moth_taxonomy.get_column_default("Location"),
-        location_list=location_list,
     )
 
 
