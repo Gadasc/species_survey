@@ -1446,8 +1446,35 @@ def config_add_option():
 
         When deleting the default we need to set the database column default to NULL
     """
-    for k, v in request.forms.items():
-        print(f"{k}: {v}")
+
+    option_data = json.loads(request.forms["option_data"])
+    print("OPTION DATA:", option_data)
+    # A map of column name from moth_records table to its options table
+    options_map = {
+        "Location": "locations_list",
+        "Trap": "traps_list",
+        "Recorder": "recorders_list",
+    }
+
+    # Option
+    option_name = option_data["name"]
+    option_options = option_data["list"]
+    option_default = option_data["default"]
+    print("CONFIG", option_name, ": ", option_default, " (default)")
+    # Empty table
+    get_table(f"TRUNCATE {options_map[option_name]}")
+
+    # Refill table
+    for opt_details in option_options:
+        print(opt_details)
+        quote_list = [f'"{v}"' for v in opt_details.values()]
+        get_table(
+            f"INSERT INTO {options_map[option_name]} VALUES ({', '.join(quote_list)});"
+        )
+
+    # Update default in moth_records
+    update_moth_taxonomy.set_column_default(option_name, option_default)
+    return config_options()
 
 
 @app.post("/add_location")

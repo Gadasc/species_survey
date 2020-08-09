@@ -15,42 +15,6 @@
 <p> </p>
 <div id="app"></div>
 <hr>
-<h2>Location List</h2>
-Default Location = {{default_location}}</p>
-Locations = {{location_list}}</p>
-<form action="/add_location" method="post">
-    <input id="new_loc_name" name="new_loc_name" type="text" placeholder="New location name">
-    <input id="new_loc_pos" name="new_loc_pos" type="text" placeholder="Grid Ref">
-    Default<input id="new_loc_def" name="new_loc_def" type="checkbox" value=True> 
-    Delete<input id="delete_loc" name="delete_loc" type="checkbox" value=True> 
-    <input type="submit">
-</form>
-</p>
-<hr>
-<h2>Recorder List</h2>
-Default Recorder = {{default_recorder}}</p>
-Recorders = {{recorder_list}}</p>
-<form action="/add_recorder" method="post">
-    <input id="new_recorder_name" name="new_recorder_name" type="text" placeholder="New recorder name">
-    Default<input id="new_recorder_def" name="new_recorder_def" type="checkbox" value=True>
-    Delete<input id="delete_recorder" name="delete_recorder" type="checkbox" value=True> 
-    <input type="submit">
-</form>
-<hr>
-</p>
-<h2>Trap List</h2>
-Default trap = {{default_trap}}</p>
-Lamps = {{trap_list}}</p>
-<form action="/add_trap" method="post">
-    <input id="new_trap_name" name="new_trap_name" type="text" placeholder="New trap name">
-    Default<input id="new_trap_def" name="new_trap_def" type="checkbox" value=True> 
-    Delete<input id="delete_trap" name="delete_trap" type="checkbox" value=True> 
-    <input type="submit">
-</form>
-
-<hr>
-
-
 
 </body>
 
@@ -62,7 +26,7 @@ Vue.component("options", {
         </p>
         <form action="/add_option" method="post">
         <table>
-            <input type="hidden" name="item_type" :value="option_data['name']">
+            <input type="hidden" name="option_data" :value="json_option_data">
             <tr><th v-for="col in option_data.option_template">\{\{ col \}\}</th><th>Default</th></tr>
             <tr v-for="oi in option_data.list" >
                 <td v-for="ci in oi">\{\{ ci \}\}</td>
@@ -71,23 +35,31 @@ Vue.component("options", {
             </tr>
             <tr>
                 <td v-for="col in option_data.option_template">
-                <input type="text" id="col" :name="col"  :placeholder="col" v-model:value="new_item[col]">
+                <input type="text" id="col"  :placeholder="col" v-model:value="new_item[col]">
                 </td>
                 <td><input type="radio" name="default_item" value="new_item" v-model="default_item" v-on:change="radio_change"></td>
-                <td><input type="button" name="add_item" :disabled="isNewDisabled" value="Y" @click="add_option_item($event, option_data['name'], new_item)"></td>
+                <td><input type="button" name="add_item" :disabled="isNewDisabled" value="+" @click="add_option_item($event, option_data['name'], new_item)"></td>
             </tr>
         </table>
         <input type="submit">
         </form>
         <hr>
         </div>`,
+    props: ['option_data'],
     data: function(){
         return {
             default_item: this.option_data.default,
             new_item: {}
         }
     },
-    props: ['option_data'],
+    watch: {
+            default_item: {
+                handler(val) {
+                    this.update_default_value(this.option_data.name, val);
+                },
+                deep: true
+            }
+        },
     computed: {
         isNewDisabled: function(){
             console.log("Values: ", (Object.values(this.new_item)));
@@ -110,6 +82,9 @@ Vue.component("options", {
         },
         existingValues: function(){
             return this.option_data.list.map(function(obj){return Object.values(obj)[0]});
+        },
+        json_option_data: function(){
+            return JSON.stringify(this.option_data);
         }
     },
     methods: {
@@ -133,7 +108,12 @@ Vue.component("options", {
         },
         radio_change: function(event){
             console.log("Radio change", event.target.value);
+        },
+        update_default_value: function(option_name, val){
+            console.log("Updateing default ", option_name, val);
+            this.$emit("update_option_default", option_name, val);
         }
+
     }
 
 })
@@ -147,6 +127,7 @@ vm = new Vue({
             :key="opt.name"
             v-on:delete_option_item="delete_option_item"
             v-on:add_option_item="add_option_item"
+            v-on:update_option_default="update_option_default"
         >
         </options>
     </div>
@@ -172,7 +153,11 @@ vm = new Vue({
         add_option_item: function(o_type, item_val){
             console.log("Add new item", o_type, item_val);
             this.detail_options[o_type].list.push(item_val);
+        },
+        update_option_default: function(o_type, o_val){
+            this.detail_options[o_type].default = o_val;
         }
+
     }
 })
 </script>
