@@ -1417,13 +1417,9 @@ def config_options():
     """ Configuration page for options
     """
 
-    recorder_list = get_table("SELECT * from recorders_list;")["Recorder"].to_list()
-    trap_list = get_table("SELECT * from traps_list;")["Trap"].to_list()
-    location_list = (
-        get_table("SELECT * from locations_list;")
-        .set_index("Name")
-        .to_dict()["OSGB_Grid"]
-    )
+    recorder_list = get_table("SELECT * from recorders_list;")
+    trap_list = get_table("SELECT * from traps_list;")
+    location_list = get_table("SELECT * from locations_list;")
 
     def_location = update_moth_taxonomy.get_column_default("Location")
     def_recorder = update_moth_taxonomy.get_column_default("Recorder")
@@ -1431,13 +1427,27 @@ def config_options():
 
     return template(
         "options",
-        location_list=location_list,
-        def_location=def_location,
-        recorder_list=recorder_list,
-        def_recorder=def_recorder,
-        trap_list=trap_list,
-        def_trap=def_trap,
+        location_template=location_list.columns.to_list(),
+        location_list=location_list.to_dict(orient="records"),
+        default_location=def_location,
+        recorder_template=recorder_list.columns.to_list(),
+        recorder_list=recorder_list.to_dict(orient="records"),
+        default_recorder=def_recorder,
+        trap_template=trap_list.columns.to_list(),
+        trap_list=trap_list.to_dict(orient="records"),
+        default_trap=def_trap,
     )
+
+
+@app.post("/add_option")
+def config_add_option():
+    """ Modify the possible options list.
+        Delete, then update
+
+        When deleting the default we need to set the database column default to NULL
+    """
+    for k, v in request.forms.items():
+        print(f"{k}: {v}")
 
 
 @app.post("/add_location")
