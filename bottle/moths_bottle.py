@@ -27,7 +27,7 @@ data of bio-survey.
   * Food plant correlation and prediction
 
 ### History
-     9 Jul 2020 - started to develop additional data for iRecord. ghi0020
+     10 Aug 2020 - ghi0020: Added options for Recorder, Lamp and Location
      1 Jul 2020
         - On home page set focus to search box when it loads
         - Latest page highlight persist while first is in table - not just latest date
