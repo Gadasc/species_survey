@@ -1019,13 +1019,12 @@ def recent_survey():
 def serve_survey2(dash_date_str=None):
     """ Generate a survey sheet to records today's results in. """
 
-    if dash_date_str:
-        # generate day_count_YYYYMMDD.json file to later recover the records.
-        generate_records_file(None, dash_date_str)
-    else:
-        # Otherwise assume the file exists
-        # Create today's dat_date_str
+    if not dash_date_str:
+        # Create today's dash_date_str
         dash_date_str = dt.date.today().strftime("%Y-%m-%d")
+
+    # generate day_count_YYYYMMDD.json file to later recover the records.
+    generate_records_file(None, dash_date_str)
 
     # This creates a manifest file which shows possible catches.
     # The template uses this to populate the survey sheet.
@@ -1048,7 +1047,8 @@ def serve_survey2(dash_date_str=None):
                 }
                 for k, v in records.items()
             ]
-    except FileNotFoundError:
+    #    except FileNotFoundError:
+    except IndexError:
         unmangled_records = []
 
     moth_logger.debug(f"Recent moths:{str(unmangled_records)}")
@@ -1060,7 +1060,7 @@ def serve_survey2(dash_date_str=None):
     print(location_list)
     return template(
         "vue_survey.tpl",
-        records=unmangled_records,
+        records=json.dumps(unmangled_records),
         dash_date_str=dash_date_str,
         default_location=update_moth_taxonomy.get_column_default("Location"),
         location_list=location_list,

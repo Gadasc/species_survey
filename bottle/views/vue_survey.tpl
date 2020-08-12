@@ -425,7 +425,9 @@
     // This combination is not reactive so can be done once on load. 
 
     manifest_moths = recent_moths;  // From manifest.js
+    console.log("records: ", {{!records}})
     captured_moths = {{!records}};
+    console.log("Captured Moths: ", captured_moths)
     // combine manifest_moths and captured moths
     var all_moths = []
     // First add recently seen species from the manifest
