@@ -28,6 +28,7 @@ data of bio-survey.
 
 ### History
 
+    12 Aug 2020 - using JSON obj to pass captured moths to survey sheet
     11 Aug 2020 - disabled lastpass for Survey page, and reset count colours as needed
     10 Aug 2020 - ghi0020: Added options for Recorder, Lamp and Location
     1 Jul 2020
