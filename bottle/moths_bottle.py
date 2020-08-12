@@ -27,8 +27,10 @@ data of bio-survey.
   * Food plant correlation and prediction
 
 ### History
-     10 Aug 2020 - ghi0020: Added options for Recorder, Lamp and Location
-     1 Jul 2020
+
+    11 Aug 2020 - disabled lastpass for Survey page, and reset count colours as needed
+    10 Aug 2020 - ghi0020: Added options for Recorder, Lamp and Location
+    1 Jul 2020
         - On home page set focus to search box when it loads
         - Latest page highlight persist while first is in table - not just latest date
         - Now includes all species in drop down list, and jumps to species that exist

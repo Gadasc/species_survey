@@ -52,7 +52,7 @@
         template: `<tr v-bind:class="{'virgin' : isVirgin, 'updated': isUpdated, 'flash': flash_flag}" :id="uriSpecies">
                    <td>\{\{moth_record.species\}\}<input type="hidden" v-bind:name="moth_record.species" v-model="safeJSONMothObject"></td>
                    <td><button class="round_button" v-on:click.prevent='decrement'>-</button></td>
-                   <td class="count"><input class="col_count" v-model="moth_record.count"></td>
+                   <td class="count"><input class="col_count" v-model="moth_record.count" data-lpignore="true"></td>
                    <td><button class="round_button" v-on:click.prevent="increment">+</button></td>
                    <td class="recent">\{\{moth_record.recent\}\}</td>
                    
@@ -69,7 +69,7 @@
         props: ['moth_record', 'detail_options'],
         data: function(){
             return {
-                flash_flag: false
+                flash_flag: false,
             }
         },
         methods: {
@@ -77,7 +77,7 @@
                 console.log("Decrement", this.moth_record.species)
                 if (this.moth_record.count > 0){
                     this.moth_record.count -= 1;
-                    this.moth_record.virgin = false;
+                    /* this.moth_record.virgin = false;*/
                     this.moth_record.updated = true;
                     cache_update_species(this.moth_record);
                 }
@@ -85,7 +85,7 @@
             increment: function(){
                 console.log("Increment", this.moth_record.species);
                 this.moth_record.count += 1;
-                this.moth_record.virgin = false;
+                /* this.moth_record.virgin = false; */
                 this.moth_record.updated = true;
                 cache_update_species(this.moth_record);
             },
@@ -103,10 +103,10 @@
         },
         computed: {
             isVirgin: function(){
-                return this.moth_record.virgin;
+                return this.moth_record.virgin && (this.moth_record.count == this.moth_record.orig_count);
             },
             isUpdated: function(){
-                return this.moth_record.updated;
+                return (this.moth_record.count != this.moth_record.orig_count);
             },
             uriSpecies: function(){
                 return encodeURI(this.moth_record.species);
@@ -135,8 +135,8 @@
         template: `
             <div class="match_list_container">
             <input type="text"
-                autocomplete="off" 
-                placeholder="New moth" 
+                placeholder="New moth"
+                id="moth_search" 
                 v-on:input="list_candidates" 
                 v-on:keyup.down="process_down_event" 
                 v-on:keyup.up="process_up_event"
@@ -288,7 +288,7 @@
         el: '#app',
         template: `    
         <div>
-        <form id="mothsForm" autocomplete="on" action="/handle_survey" method="post" v-on:keydown.enter.prevent>
+        <form id="mothsForm" autocomplete="off"  action="/handle_survey" method="post" v-on:keydown.enter.prevent>
         Date: <a class=daynav v-bind:href=yesterday>&#9664;</a>
               <input class="survey_date"  type="date" name="dash_date_str" v-bind:max="get_today_str" v-model:value="this_date" required @change="jumpDate">
               <a class=daynav v-bind:href=tomorrow>&#9654;</a><button type="submit">Submit</button></p>
@@ -349,7 +349,8 @@
                 console.log(new_species);
                 var species_object = {
                     "species": new_species, 
-                    "recent": 0, 
+                    "recent": 0,
+                    "orig_count": 0, 
                     "count": 0, 
                     "virgin": true, 
                     "updated": false, 
@@ -434,6 +435,8 @@
             item.recorder = false;
             item.trap = false;
             item.location = false;
+            item.count = 0;
+            item.orig_count = 0;
             all_moths.push(item);
         }
     );
@@ -448,6 +451,7 @@
             console.log("Found duplicate record for " + item.species + " at: " + first_match);
             // Update record only if the record is null
             all_moths[first_match].count = item.count;
+            all_moths[first_match].orig_count = item.count;
             all_moths[first_match].location = item.location;
             all_moths[first_match].recorder = item.recorder;
             all_moths[first_match].trap = item.trap;
