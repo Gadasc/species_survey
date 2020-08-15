@@ -24,27 +24,28 @@ Vue.component("options", {
     template: `<div>
         <h2>\{\{ option_data["name"] \}\} List</h2>
         </p>
-        <form action="/add_option" method="post">
+        <form action="/add_option" method="post" ref="form" >
         <table>
             <input type="hidden" name="option_data" :value="json_option_data">
             <tr><th v-for="col in option_data.option_template">\{\{ col \}\}</th><th>Default</th></tr>
             <tr v-for="oi in option_data.list" >
                 <td v-for="ci in oi">\{\{ ci \}\}</td>
-                <td><input type="radio" name="default_item" :value="Object.values(oi)[0]" v-model="default_item" v-on:change="radio_change"></td>
+                <td><input type="radio" name="default_option" :value="Object.values(oi)[0]" v-model="default_item" v-on:change="radio_change"></td>
                 <td><input type="button" name="delete_item" value="X" @click="delete_option_item($event, option_data['name'], Object.values(oi)[0])"></td>
             </tr>
             <tr>
                 <td v-for="col in option_data.option_template">
                 <input type="text" id="col"  :placeholder="col" v-model:value="new_item[col]">
                 </td>
-                <td><input type="radio" name="default_item" value="new_item" v-model="default_item" v-on:change="radio_change"></td>
-                <td><input type="button" name="add_item" :disabled="isNewDisabled" value="+" @click="add_option_item($event, option_data['name'], new_item)"></td>
+                <td><input type="radio" name="default_option" value="new_item" v-model="default_item" v-on:change="radio_change"></td>
+                <td><input type="button" name="add_item" :disabled="isNewDisabled" value="+" @submit.prevent @click="add_option_item($event, option_data['name'], new_item)"></td>
             </tr>
         </table>
-        <input type="submit">
         </form>
         <hr>
         </div>`,
+        
+
     props: ['option_data'],
     data: function(){
         return {
@@ -56,6 +57,9 @@ Vue.component("options", {
             default_item: {
                 handler(val) {
                     this.update_default_value(this.option_data.name, val);
+                    this.$nextTick(function(){
+                        this.$refs.form.submit();
+                    })
                 },
                 deep: true
             }
@@ -111,7 +115,6 @@ Vue.component("options", {
         },
         update_default_value: function(option_name, val){
             console.log("Updateing default ", option_name, val);
-            this.$emit("update_option_default", option_name, val);
         }
 
     }
@@ -125,6 +128,7 @@ vm = new Vue({
         <options v-for="opt in detail_options" 
             :option_data="opt" 
             :key="opt.name"
+            :ref="opt.name"
             v-on:delete_option_item="delete_option_item"
             v-on:add_option_item="add_option_item"
             v-on:update_option_default="update_option_default"
@@ -149,13 +153,22 @@ vm = new Vue({
                 values.splice(i, 1)
             }
             console.log(values);
+            this.$nextTick(function(){
+                this.$refs[o_type][0].$refs.form.submit();  
+            });
         },
         add_option_item: function(o_type, item_val){
             console.log("Add new item", o_type, item_val);
             this.detail_options[o_type].list.push(item_val);
+            this.$nextTick(function(){
+                this.$refs[o_type][0].$refs.form.submit();  
+            });
         },
         update_option_default: function(o_type, o_val){
-            this.detail_options[o_type].default = o_val;
+            this.detail_options[o_type][0].default = o_val;
+            this.$nextTick(function(){
+                this.$refs[o_type][0].$refs.form.submit();  
+            });
         }
 
     }

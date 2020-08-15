@@ -200,13 +200,19 @@ def update_records(mapfile_name):
 def set_column_default(col_name, def_value):
     """ Encapsulates the methods for updating the column defaults
     """
-    get_table(
-        f"""ALTER TABLE moth_records ALTER {col_name} SET DEFAULT "{def_value}";"""
-    )
 
-    # If any entries are NULL set to defaul
+    if def_value in ["NULL", None, ""]:  # Seems hacky to me but "NULL" won't work
+        print("Really setting defauly to NULL")
+        get_table(f"""ALTER TABLE moth_records ALTER {col_name} SET DEFAULT NULL;""")
+    else:
+        get_table(
+            f"""ALTER TABLE moth_records ALTER {col_name} SET DEFAULT "{def_value}";"""
+        )
+
+    # If any entries are NULL set to default
     get_table(
-        f'UPDATE moth_records SET {col_name}="{def_value}" WHERE  {col_name} IS NULL;'
+        f'UPDATE moth_records SET {col_name}="{def_value}"'
+        f' WHERE  {col_name} IN (NULL, "NULL", "", "None");'
     )
 
 

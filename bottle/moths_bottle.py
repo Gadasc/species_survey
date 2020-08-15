@@ -28,6 +28,8 @@ data of bio-survey.
 
 ### History
 
+    15 Aug 2020 - Maked options apply immediately, and fixing NULL record issue
+    14 Aug 2020 - Make opt default sticky for  browser iff it is in the option list
     12 Aug 2020 - using JSON obj to pass captured moths to survey sheet
     11 Aug 2020 - disabled lastpass for Survey page, and reset count colours as needed
     10 Aug 2020 - ghi0020: Added options for Recorder, Lamp and Location
@@ -1281,9 +1283,9 @@ def survey_handler():
             print(k, v)
 
     date_string = request.forms["dash_date_str"]
-    default_recorder = request.forms.get("option_Recorder")
-    default_trap = request.forms.get("option_Trap")
-    default_location = request.forms.get("option_Location")
+    default_recorder = request.forms.get("option_Recorder") or "NULL"
+    default_trap = request.forms.get("option_Trap") or "NULL"
+    default_location = request.forms.get("option_Location") or "NULL"
 
     fout_json = (
         cfg["RECORDS_PATH"] + "day_count_" + date_string.replace("-", "") + ".json"
@@ -1463,6 +1465,11 @@ def config_add_option():
     option_name = option_data["name"]
     option_options = option_data["list"]
     option_default = option_data["default"]
+    try:
+        option_default = request.forms["default_option"]
+    except KeyError:
+        option_default = "NULL"
+
     print("CONFIG", option_name, ": ", option_default, " (default)")
     # Empty table
     get_table(f"TRUNCATE {options_map[option_name]}")
@@ -1478,85 +1485,6 @@ def config_add_option():
     # Update default in moth_records
     update_moth_taxonomy.set_column_default(option_name, option_default)
     return config_options()
-
-
-# @app.post("/add_location")
-# def config_add_location():
-#     """ Modify the possible locations list.
-#         Delete, then update
-
-#         When deleting the default we need to set the database column default to NULL
-#     """
-#     print(request.forms)
-#     new_loc_name = request.forms["new_loc_name"]
-#     new_loc_pos = re.sub(r"\s", "", request.forms["new_loc_pos"])  # Strip whitespace
-#     new_loc_def = request.forms.get("new_loc_def", default=False, type=bool)
-#     delete_loc = request.forms.get("delete_loc", default=False, type=bool)
-#     orig_loc_def = update_moth_taxonomy.get_column_default("Location")
-#     loc_list = get_table("SELECT Name from locations_list;")
-#     print(loc_list)
-#     get_table(f"""DELETE FROM locations_list WHERE Name="{new_loc_name}";""")
-#     if not delete_loc:
-#         get_table(
-#             f"""INSERT INTO locations_list
-#                 (Name, OSGB_Grid)
-#                 VALUES
-#                 ("{new_loc_name}", "{new_loc_pos}");"""
-#         )
-
-#     if new_loc_def:
-#         update_moth_taxonomy.set_column_default("Location", new_loc_name)
-#     if delete_loc and orig_loc_def not in loc_list:
-#         update_moth_taxonomy.set_column_default("Location", "NULL")
-#     return config_options()
-
-
-# @app.post("/add_trap")
-# def config_add_trap():
-#     """ Modify the possible lamp list
-#     """
-#     print(request.forms)
-#     new_trap_name = request.forms["new_trap_name"]
-#     new_trap_def = request.forms.get("new_trap_def", default=False, type=bool)
-#     delete_trap = request.forms.get("delete_trap", default=False, type=bool)
-#     orig_trap_def = update_moth_taxonomy.get_column_default("Trap")
-#     trap_list = get_table("SELECT Trap from traps_list;")
-
-#     get_table(f"""DELETE FROM traps_list WHERE Trap="{new_trap_name}";""")
-#     if not delete_trap:
-#         get_table(f"""INSERT INTO traps_list  (Trap) VALUES ("{new_trap_name}");""")
-
-#     if new_trap_def and not delete_trap:
-#         update_moth_taxonomy.set_column_default("Trap", new_trap_name)
-#     if delete_trap and orig_trap_def not in trap_list:
-#         update_moth_taxonomy.set_column_default("Trap", "NULL")
-
-#     return config_options()
-
-
-# @app.post("/add_recorder")
-# def config_add_recorder():
-#     """ Modify the recorder.
-#     """
-#     print(request.forms)
-#     new_recorder_name = request.forms["new_recorder_name"]
-#     new_recorder_def = request.forms.get("new_recorder_def", default=False, type=bool)
-#     delete_recorder = request.forms.get("delete_recorder", default=False, type=bool)
-#     orig_recorder_def = update_moth_taxonomy.get_column_default("Recorder")
-#     recorder_list = get_table("SELECT Recorder from recorders_list;")
-
-#     get_table(f'DELETE FROM recorders_list WHERE Recorder="{new_recorder_name}";')
-#     if not delete_recorder:
-#         get_table(
-#             f'INSERT INTO recorders_list  (Recorder) VALUES ("{new_recorder_name}");'
-#         )
-
-#     if new_recorder_def:
-#         update_moth_taxonomy.set_column_default("Recorder", new_recorder_name)
-#     if delete_recorder and orig_recorder_def not in recorder_list:
-#         update_moth_taxonomy.set_column_default("Recorder", "NULL")
-
-#     return config_options()
 
 
 if __name__ == "__main__":

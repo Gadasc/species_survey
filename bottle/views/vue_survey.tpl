@@ -508,6 +508,18 @@
             if (hidden === false){
                 vm.detail_options[option_name].hidden = item[1].hidden;
             }
+
+            // If a default location has been cached on this browser, use this to over-ride the settings
+            browser_default = item[1].default;
+            console.log("Browser default [", option_name,"] = ", browser_default);
+            console.log("Options allowed: ", vm.detail_options[option_name].list);
+            if (vm.detail_options[option_name].list.includes(browser_default)){
+                console.log("Overriding default [",vm.detail_options[option_name].default, "] with ", browser_default);
+                vm.detail_options[option_name].default = browser_default;
+            } else {
+                console.log("Default no longer valid - reverting to: ", vm.detail_options[option_name].default)
+            }
+
        })
     }
     
