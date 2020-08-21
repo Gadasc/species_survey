@@ -27,7 +27,7 @@ data of bio-survey.
   * Food plant correlation and prediction
 
 ### History
-
+    18 Aug 2020 - Started work to improve latest page.
     12 Aug 2020 - using JSON obj to pass captured moths to survey sheet
     11 Aug 2020 - disabled lastpass for Survey page, and reset count colours as needed
     10 Aug 2020 - ghi0020: Added options for Recorder, Lamp and Location
@@ -1198,6 +1198,60 @@ def create_species_div(mothname, ffy=False, nft=False):
     return f'<div class="{classes}">{moth_link}{tt}</div>'
 
 
+@app.route("/latest2")
+def show_latest2():
+    """ Table showing the latest moths - need to consider options
+        e.g. location (allow multiple selections)
+    """
+
+    # Get the records for last 14 dates trapped
+    recent_df = get_table(
+        """SELECT mr.Date, mr.MothName, mr.MothCount FROM moth_records mr
+            JOIN
+        (SELECT Date from moth_records
+            GROUP BY Date
+            ORDER BY DATE DESC LIMIT 14) dates
+            ON mr.Date = dates.Date ORDER BY Date;"""
+    )
+
+    earliest_table_date = min(recent_df.Date)
+
+    not_nft = get_table(
+        f"""SELECT MothName, Date from moth_records
+        JOIN (
+        SELECT MothName, TVK from {cfg["TAXONOMY_TABLE"]}) it USING (MothName)
+        GROUP BY TVK Having COUNT(TVK) > 0 AND Date < Date("{earliest_table_date}");"""
+    ).MothName.to_list()
+
+    not_ffy = get_table(
+        f"""SELECT MothName, Date FROM
+        moth_records
+        JOIN (
+        SELECT MothName, TVK from {cfg["TAXONOMY_TABLE"]}) it USING (MothName)
+        WHERE YEAR(Date) = YEAR(NOW())
+        GROUP BY TVK Having COUNT(TVK) > 0 AND Date < Date("{earliest_table_date}");"""
+    ).MothName.to_list()
+
+    recent_df["Date"] = recent_df["Date"].apply(lambda dd: dd.strftime("%Y-%b-%d"))
+    recent_df["Species"] = recent_df["MothName"]
+    recent_df.set_index(["Date", "MothName", "Species"], inplace=True)
+
+    latest_table = (
+        recent_df["MothCount"].unstack(["Date"]).fillna("").droplevel("MothName")
+    )
+
+    table_moths = set(latest_table.index)
+    nft = table_moths - set(not_nft)
+    ffy = table_moths - set(not_ffy) - nft
+
+    return template(
+        "latest2.tpl",
+        records=latest_table.to_json(orient="split"),
+        nft=json.dumps(list(nft)),
+        ffy=json.dumps(list(ffy)),
+    )
+
+
 @app.route("/latest")
 def show_latest():
     """ Shows the latest catches for 14 traps . """
@@ -1227,12 +1281,6 @@ def show_latest():
 
     earliest_table_date = min(recent_df.Date)
 
-    # Find New For Trap and First For Year
-    # nft = get_table(
-    #     f"""SELECT MothName, Date from moth_records
-    #     JOIN (
-    #     SELECT MothName, TVK from {cfg["TAXONOMY_TABLE"]}) it USING (MothName)
-    #     GROUP BY TVK Having COUNT(TVK) = 1 AND Date = Date(NOW());"""
     not_nft = get_table(
         f"""SELECT MothName, Date from moth_records
         JOIN (
@@ -1478,85 +1526,6 @@ def config_add_option():
     # Update default in moth_records
     update_moth_taxonomy.set_column_default(option_name, option_default)
     return config_options()
-
-
-# @app.post("/add_location")
-# def config_add_location():
-#     """ Modify the possible locations list.
-#         Delete, then update
-
-#         When deleting the default we need to set the database column default to NULL
-#     """
-#     print(request.forms)
-#     new_loc_name = request.forms["new_loc_name"]
-#     new_loc_pos = re.sub(r"\s", "", request.forms["new_loc_pos"])  # Strip whitespace
-#     new_loc_def = request.forms.get("new_loc_def", default=False, type=bool)
-#     delete_loc = request.forms.get("delete_loc", default=False, type=bool)
-#     orig_loc_def = update_moth_taxonomy.get_column_default("Location")
-#     loc_list = get_table("SELECT Name from locations_list;")
-#     print(loc_list)
-#     get_table(f"""DELETE FROM locations_list WHERE Name="{new_loc_name}";""")
-#     if not delete_loc:
-#         get_table(
-#             f"""INSERT INTO locations_list
-#                 (Name, OSGB_Grid)
-#                 VALUES
-#                 ("{new_loc_name}", "{new_loc_pos}");"""
-#         )
-
-#     if new_loc_def:
-#         update_moth_taxonomy.set_column_default("Location", new_loc_name)
-#     if delete_loc and orig_loc_def not in loc_list:
-#         update_moth_taxonomy.set_column_default("Location", "NULL")
-#     return config_options()
-
-
-# @app.post("/add_trap")
-# def config_add_trap():
-#     """ Modify the possible lamp list
-#     """
-#     print(request.forms)
-#     new_trap_name = request.forms["new_trap_name"]
-#     new_trap_def = request.forms.get("new_trap_def", default=False, type=bool)
-#     delete_trap = request.forms.get("delete_trap", default=False, type=bool)
-#     orig_trap_def = update_moth_taxonomy.get_column_default("Trap")
-#     trap_list = get_table("SELECT Trap from traps_list;")
-
-#     get_table(f"""DELETE FROM traps_list WHERE Trap="{new_trap_name}";""")
-#     if not delete_trap:
-#         get_table(f"""INSERT INTO traps_list  (Trap) VALUES ("{new_trap_name}");""")
-
-#     if new_trap_def and not delete_trap:
-#         update_moth_taxonomy.set_column_default("Trap", new_trap_name)
-#     if delete_trap and orig_trap_def not in trap_list:
-#         update_moth_taxonomy.set_column_default("Trap", "NULL")
-
-#     return config_options()
-
-
-# @app.post("/add_recorder")
-# def config_add_recorder():
-#     """ Modify the recorder.
-#     """
-#     print(request.forms)
-#     new_recorder_name = request.forms["new_recorder_name"]
-#     new_recorder_def = request.forms.get("new_recorder_def", default=False, type=bool)
-#     delete_recorder = request.forms.get("delete_recorder", default=False, type=bool)
-#     orig_recorder_def = update_moth_taxonomy.get_column_default("Recorder")
-#     recorder_list = get_table("SELECT Recorder from recorders_list;")
-
-#     get_table(f'DELETE FROM recorders_list WHERE Recorder="{new_recorder_name}";')
-#     if not delete_recorder:
-#         get_table(
-#             f'INSERT INTO recorders_list  (Recorder) VALUES ("{new_recorder_name}");'
-#         )
-
-#     if new_recorder_def:
-#         update_moth_taxonomy.set_column_default("Recorder", new_recorder_name)
-#     if delete_recorder and orig_recorder_def not in recorder_list:
-#         update_moth_taxonomy.set_column_default("Recorder", "NULL")
-
-#     return config_options()
 
 
 if __name__ == "__main__":
