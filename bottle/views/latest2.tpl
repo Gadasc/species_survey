@@ -39,12 +39,16 @@ if (cindex != -1){
 Vue.component("record_row", {
     template: `
     <tr>
-        <th :class="{ffy: is_ffy, nft: is_nft}"> \{\{ record_species \}\} </th>
-        <td v-for="data_item in record_data" class="td_classes">\{\{ data_item \}\}</td>
+        <th :class="{ffy: is_ffy, nft: is_nft, tooltip: true}"> 
+            <a :href="'/species/'+record_species">\{\{ record_species \}\} 
+            <span :class="{tooltiptext: is_ffy | is_nft}">\{\{ tooltipstring \}\}</span></a> </th>
+        <td :class="is_first[index]" v-for="data_item, index in record_data" >\{\{ data_item \}\}</td>
     </tr>`,
     props:["record_data", "record_species"],
     data: function(){
-        return {}
+        return {
+            found: true
+        }
     }, 
     computed: {
         is_nft: function(){
@@ -53,7 +57,28 @@ Vue.component("record_row", {
         is_ffy: function(){
             return (ffy.includes(this.record_species));
         },
-        td_classes:function(){
+        tooltipstring: function(){
+            if (this.is_nft) return "New For Trap";
+            if (this.is_ffy) return "First For Year";
+            return "";
+        },
+        is_first:function(){
+            var found_first = false;
+            var fstyle = false;
+            if (this.is_ffy) fstyle = "ffy";
+            if (this.is_nft) fstyle = "nft";
+            if (!this.is_ffy & !this.is_nft) return {};
+            return this.record_data.map(function(value, i){
+                if (!found_first & value){
+                    found_first = true;
+                    obj = {}
+                    obj[fstyle] = true;
+                    return obj;
+                }
+                else {
+                    return {}
+                }
+            })
 
         }
 
@@ -65,17 +90,25 @@ vm = new Vue({
     el: '#app',
     template: `    
     <div>
-    <table>
-    <tr><th>Date</th>
+    <table border=1 class="latest_table">
+    <thead>
+    <tr><th>Month</th>
         <th v-for="mn in months" :key="mn.name" :colspan="mn.count">\{\{ mn.name \}\}</th>
     </tr>
-    <tr><th>Species</th>
-    <th v-for="day in days">\{\{ day \}\}</th>
+    <tr><th>Date</th>
+    <th v-for="day, index in days"><a :href="'/survey/'+all_records.columns[index]">\{\{ day \}\}</a></th>
     </tr>
+    <tr>
+    <th>Species</th>
+    <th v-for="day in days"></th>
+    </tr>
+    </thead>
+    <tbody>
     <record_row v-for="species, index in all_records.index" 
         :key="species" 
         :record_data="all_records.data[index]" 
         :record_species="species"></record_row>
+    </tbody>
     </table>
     </div>`,
     data: {
@@ -96,7 +129,8 @@ vm = new Vue({
             var biggest = {name: "", count:0};
 
             this.all_records.columns.forEach(function(item, index){
-                this_month = item.split("-")[1] + " " + item.split("-")[0];
+                var this_date = new Date(item);
+                var this_month = this_date.toLocaleDateString('default', {month: 'short', year: 'numeric'});
                 if (!months_order.includes(this_month)){
                     months_order.push(this_month);
                 }
