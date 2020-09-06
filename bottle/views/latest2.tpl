@@ -69,7 +69,7 @@ Vue.component("record_row", {
             if (this.is_nft) fstyle = "nft";
             if (!this.is_ffy & !this.is_nft) return {};
             return this.record_data.map(function(value, i){
-                if (!found_first & value){
+                if (!found_first && value){
                     found_first = true;
                     obj = {}
                     obj[fstyle] = true;

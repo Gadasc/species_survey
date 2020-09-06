@@ -27,6 +27,7 @@ data of bio-survey.
   * Food plant correlation and prediction
 
 ### History
+     6 Sep 2020 - Fixed some bugs on /latest page that showed nfy/fft in error
     31 Aug 2020 - Refactored "/latest" page to use Vue
     18 Aug 2020 - Started work to improve latest page.
     12 Aug 2020 - using JSON obj to pass captured moths to survey sheet
@@ -1185,31 +1186,30 @@ def show_latest():
 
     # Get the records for last 14 dates trapped
     recent_df = get_table(
-        """SELECT mr.Date, mr.MothName, mr.MothCount FROM moth_records mr
-            JOIN
-        (SELECT Date from moth_records
+        """SELECT mr.Date, mr.MothName, mr.MothCount, TVK FROM moth_records mr
+            JOIN irecord_taxonomy USING (MothName)
+            JOIN (SELECT Date from moth_records
             GROUP BY Date
-            ORDER BY DATE DESC LIMIT 14) dates
-            ON mr.Date = dates.Date ORDER BY Date;"""
+            ORDER BY Date DESC LIMIT 14) dates
+            USING (Date) ORDER BY Date;"""
     )
 
     earliest_table_date = min(recent_df.Date)
+    print("EARLIEST:", earliest_table_date)
 
-    not_nft = get_table(
-        f"""SELECT MothName, Date from moth_records
-        JOIN (
-        SELECT MothName, TVK from {cfg["TAXONOMY_TABLE"]}) it USING (MothName)
-        GROUP BY TVK Having COUNT(TVK) > 0 AND Date < Date("{earliest_table_date}");"""
-    ).MothName.to_list()
+    seen_before = get_table(
+        f"""SELECT MothName, YEAR(Max(Date)) Year, TVK FROM
+                (SELECT * FROM moth_records WHERE
+                    Date < Date("{earliest_table_date}") ) mr
+                JOIN
+                {cfg["TAXONOMY_TABLE"]} USING (MothName)
+        GROUP BY MothName;"""
+    )
 
-    not_ffy = get_table(
-        f"""SELECT MothName, Date FROM
-        moth_records
-        JOIN (
-        SELECT MothName, TVK from {cfg["TAXONOMY_TABLE"]}) it USING (MothName)
-        WHERE YEAR(Date) = YEAR(NOW())
-        GROUP BY TVK Having COUNT(TVK) > 0 AND Date < Date("{earliest_table_date}");"""
-    ).MothName.to_list()
+    not_nft = seen_before.MothName.to_list()
+    not_ffy = seen_before[seen_before.Year == dt.date.today().year].MothName.to_list()
+
+    print("not_ffy: ", not_ffy)
 
     recent_df["Date"] = recent_df["Date"].apply(lambda dd: dd.strftime("%Y-%m-%d"))
     recent_df["Species"] = recent_df["MothName"]
@@ -1222,6 +1222,7 @@ def show_latest():
     table_moths = set(latest_table.index)
     nft = table_moths - set(not_nft)
     ffy = table_moths - set(not_ffy) - nft
+    print("Angle Shades: ", "Angle Shades" in ffy)
 
     return template(
         "latest2.tpl",
