@@ -27,7 +27,10 @@ data of bio-survey.
   * Food plant correlation and prediction
 
 ### History
-
+     6 Sep 2020 - /latest no longer highlights synonyms as FFY/NFT if TVK seen before
+     6 Sep 2020 - Fixed some bugs on /latest page that showed nfy/fft in error
+    31 Aug 2020 - Refactored "/latest" page to use Vue
+    18 Aug 2020 - Started work to improve latest page.
     15 Aug 2020 - Maked options apply immediately, and fixing NULL record issue
     14 Aug 2020 - Make opt default sticky for  browser iff it is in the option list
     12 Aug 2020 - using JSON obj to pass captured moths to survey sheet
@@ -1178,97 +1181,58 @@ def get_species(species):
         )
 
 
-def create_species_div(mothname, ffy=False, nft=False):
-    """ Called from pd.apply
-        Returns a <div> of HTML enclosing mothname and CSS styles
-    """
-    classes = "nft" if nft else "ffy" if ffy else ""
-    tt = ""
-
-    if nft:
-        tooltiptext = "New For Trap"
-    elif ffy:
-        tooltiptext = "First For Year"
-    else:
-        tooltiptext = ""
-
-    if nft or ffy:
-        tt = f'<span class="tooltiptext">{tooltiptext}</span>'
-        classes += " tooltip"
-
-    moth_link = f'<a href="/species/{mothname}">{mothname}</a>'
-    return f'<div class="{classes}">{moth_link}{tt}</div>'
-
-
 @app.route("/latest")
 def show_latest():
-    """ Shows the latest catches for 14 traps . """
+    """ Table showing the latest moths - need to consider options
+        e.g. location (allow multiple selections)
+    """
 
+    # Get the records for last 14 dates trapped
     recent_df = get_table(
-        """SELECT mr.Date, mr.MothName, mr.MothCount FROM moth_records mr
-            JOIN
-        (SELECT Date from moth_records
+        """SELECT mr.Date, mr.MothName, mr.MothCount, TVK FROM moth_records mr
+            JOIN irecord_taxonomy USING (MothName)
+            JOIN (SELECT Date from moth_records
             GROUP BY Date
-            ORDER BY DATE DESC LIMIT 14) dates
-            ON mr.Date = dates.Date ORDER BY Date;"""
+            ORDER BY Date DESC LIMIT 14) dates
+            USING (Date) ORDER BY Date;"""
     )
-
-    # Some nice formating for the month hdg - only include year on month with most days
-    months = [rd.month for rd in recent_df.Date.unique()]
-    month_count = {mm: months.count(mm) for mm in set(months)}
-    biggest_month = sorted(month_count.items(), key=lambda kv: kv[1], reverse=True)[0][
-        0
-    ]
-    recent_df["Month"] = recent_df["Date"].apply(
-        lambda dd: f"{dd.strftime('%b %Y' if dd.month == biggest_month else '%b')}"
-    )
-
-    # Catches may be added in a any order, so it's possibe the user will always look
-    # at the latest page when they add the FFY/NFT so we need to flag when the earliest
-    # catch on the display is the FFY/NFT.
 
     earliest_table_date = min(recent_df.Date)
+    print("EARLIEST:", earliest_table_date)
 
-    # Find New For Trap and First For Year
-    # nft = get_table(
-    #     f"""SELECT MothName, Date from moth_records
-    #     JOIN (
-    #     SELECT MothName, TVK from {cfg["TAXONOMY_TABLE"]}) it USING (MothName)
-    #     GROUP BY TVK Having COUNT(TVK) = 1 AND Date = Date(NOW());"""
-    not_nft = get_table(
-        f"""SELECT MothName, Date from moth_records
-        JOIN (
-        SELECT MothName, TVK from {cfg["TAXONOMY_TABLE"]}) it USING (MothName)
-        GROUP BY TVK Having COUNT(TVK) > 0 AND Date < Date("{earliest_table_date}");"""
-    ).MothName.to_list()
-
-    not_ffy = get_table(
-        f"""SELECT MothName, Date FROM
-        moth_records
-        JOIN (
-        SELECT MothName, TVK from {cfg["TAXONOMY_TABLE"]}) it USING (MothName)
-        WHERE YEAR(Date) = YEAR(NOW())
-        GROUP BY TVK Having COUNT(TVK) > 0 AND Date < Date("{earliest_table_date}");"""
-    ).MothName.to_list()
-
-    recent_df["Species"] = recent_df["MothName"].apply(
-        lambda mn: create_species_div(mn, ffy=mn not in not_ffy, nft=mn not in not_nft)
+    seen_before = get_table(
+        f"""SELECT MothName, YEAR(Max(Date)) Year, TVK FROM
+                (SELECT * FROM moth_records WHERE
+                    Date < Date("{earliest_table_date}") ) mr
+                JOIN
+                {cfg["TAXONOMY_TABLE"]} USING (MothName)
+        GROUP BY MothName;"""
     )
-    recent_df["Date"] = recent_df["Date"].apply(
-        lambda dd: f'<a href="/survey/{dd}">{dd.strftime("%d")}</a>'
-    )
-    recent_df.set_index(["Month", "Date", "MothName", "Species"], inplace=True)
+
+    not_nft_tvk = seen_before.TVK.to_list()
+    not_ffy_tvk = seen_before[seen_before.Year == dt.date.today().year].TVK.to_list()
+
+    table_moths = dict(zip(recent_df.MothName, recent_df.TVK))
+    nft = [mn for mn, tvk in table_moths.items() if tvk not in not_nft_tvk]
+    ffy = [
+        mn
+        for mn, tvk in table_moths.items()
+        if tvk not in not_ffy_tvk and mn not in nft
+    ]
+
+    recent_df["Date"] = recent_df["Date"].apply(lambda dd: dd.strftime("%Y-%m-%d"))
+    recent_df["Species"] = recent_df["MothName"]
+    recent_df.set_index(["Date", "MothName", "Species"], inplace=True)
 
     latest_table = (
-        recent_df["MothCount"]
-        .unstack(["Month", "Date"])
-        .fillna("")
-        .droplevel("MothName")
+        recent_df["MothCount"].unstack(["Date"]).fillna("").droplevel("MothName")
     )
 
     return template(
-        "latest.tpl",
-        html_table=latest_table.to_html(escape=False, classes="latest_table"),
+        "latest2.tpl",
+        records=latest_table.to_json(orient="split"),
+        nft=json.dumps(list(nft)),
+        ffy=json.dumps(list(ffy)),
     )
 
 
@@ -1311,15 +1275,6 @@ def survey_handler():
         specimens["trap"] = specimens["trap"] or default_trap
         specimens["location"] = specimens["location"] or default_location
         results_dict[moth] = specimens
-
-        # specimens = request.forms.get(
-        #     moth, default=0, index=0, type=int
-        # )  # leave result as string
-
-        # if specimens:
-        #     # replace spaces for backward compate
-        #     # TO DO - can we remove name mangling
-        #     results_dict[moth] = str(specimens).replace(" ", "_")
 
     # Store results locally  so when survey sheet is recalled it will auto populate
     # This probably isn't really required as we can access the SQL quickly

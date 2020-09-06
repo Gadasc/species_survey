@@ -492,7 +492,7 @@
         });
     }
     
-    // Finally inject into the app
+    // Inject into the app
     vm.moths = all_moths;      
 
     // Finally recover visibility details
@@ -506,7 +506,7 @@
             hidden = item[1].hidden;
             console.log("Recover vis:", option_name, ": ", hidden);
             if (hidden === false){
-                vm.detail_options[option_name].hidden = item[1].hidden;
+                vm.detail_options[option_name].hidden = hidden;
             }
 
             // If a default location has been cached on this browser, use this to over-ride the settings
