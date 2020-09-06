@@ -27,6 +27,7 @@ data of bio-survey.
   * Food plant correlation and prediction
 
 ### History
+     6 Sep 2020 - /latest no longer highlights synonyms as FFY/NFT if TVK seen before
      6 Sep 2020 - Fixed some bugs on /latest page that showed nfy/fft in error
     31 Aug 2020 - Refactored "/latest" page to use Vue
     18 Aug 2020 - Started work to improve latest page.
@@ -1206,10 +1207,16 @@ def show_latest():
         GROUP BY MothName;"""
     )
 
-    not_nft = seen_before.MothName.to_list()
-    not_ffy = seen_before[seen_before.Year == dt.date.today().year].MothName.to_list()
+    not_nft_tvk = seen_before.TVK.to_list()
+    not_ffy_tvk = seen_before[seen_before.Year == dt.date.today().year].TVK.to_list()
 
-    print("not_ffy: ", not_ffy)
+    table_moths = dict(zip(recent_df.MothName, recent_df.TVK))
+    nft = [mn for mn, tvk in table_moths.items() if tvk not in not_nft_tvk]
+    ffy = [
+        mn
+        for mn, tvk in table_moths.items()
+        if tvk not in not_ffy_tvk and mn not in nft
+    ]
 
     recent_df["Date"] = recent_df["Date"].apply(lambda dd: dd.strftime("%Y-%m-%d"))
     recent_df["Species"] = recent_df["MothName"]
@@ -1218,11 +1225,6 @@ def show_latest():
     latest_table = (
         recent_df["MothCount"].unstack(["Date"]).fillna("").droplevel("MothName")
     )
-
-    table_moths = set(latest_table.index)
-    nft = table_moths - set(not_nft)
-    ffy = table_moths - set(not_ffy) - nft
-    print("Angle Shades: ", "Angle Shades" in ffy)
 
     return template(
         "latest2.tpl",
