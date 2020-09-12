@@ -52,7 +52,7 @@
         template: `<tr v-bind:class="{'virgin' : isVirgin, 'updated': isUpdated, 'flash': flash_flag}" :id="uriSpecies">
                    <td>\{\{moth_record.species\}\}<input type="hidden" v-bind:name="moth_record.species" v-model="safeJSONMothObject"></td>
                    <td><button class="round_button" v-on:click.prevent='decrement'>-</button></td>
-                   <td class="count"><input class="col_count" v-model="moth_record.count" data-lpignore="true"></td>
+                   <td class="count"><input class="col_count" v-model="moth_record.count" data-lpignore="true" v-on:change="validate_count"></td>
                    <td><button class="round_button" v-on:click.prevent="increment">+</button></td>
                    <td class="recent">\{\{moth_record.recent\}\}</td>
                    
@@ -98,7 +98,14 @@
                 this.moth_record[event.name.toLowerCase()] = event.value;
                 this.moth_record.updated = true;
                 cache_update_species(this.moth_record);
+            },
+            validate_count: function(){
+                console.log(this.moth_record.species, " Count: ", this.moth_record.count);
+                if (isNaN(this.moth_record.count)){
+                    this.moth_record.count = 0;
+                }
             }
+
 
         },
         computed: {

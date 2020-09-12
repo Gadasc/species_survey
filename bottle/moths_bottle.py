@@ -409,27 +409,27 @@ def get_db_update_time(use_db: bool = False) -> dt.datetime:
     return update_time
 
 
-def get_moth_grid(db):
-    """ Returns:
+def get_moth_grid():
+    """ Provides a grid of species that have been caught in this month compared with
+        previous years.
+        Returns:
         moth_grid_ccs - string with <style> for moth_grid_container - to set columns
-        moth_grid_cells - concatinated lsit of <div> containers to be inserted <grid>
+        moth_grid_cells - concatinated list of <div> containers to be inserted <grid>
      """
+    current_month = dt.date.today().month
     cols = 5
 
-    sql_species_name_by_month_year = """
+    sql_species_name_by_month_year = f"""
         SELECT tw.Year, tw.Month, tw.MothName
             FROM (
                 SELECT year(Date) Year, month(Date) Month, MothName
                     FROM moth_records
-                    WHERE MothName IS NOT NULL
+                    WHERE MothName IS NOT NULL AND month(Date) = {current_month}
                     GROUP BY Year, Month, MothName
             ) tw
         GROUP BY Year, Month, MothName;"""
 
-    db.execute(sql_species_name_by_month_year)
-    data_list = [list(c) for c in db]
-    columns = list(db.column_names)
-    species_df = pd.DataFrame(data_list, columns=columns).set_index(columns)
+    species_df = get_table(sql_species_name_by_month_year)
 
     state = {
         (True, True): "Seen",
@@ -438,11 +438,12 @@ def get_moth_grid(db):
         (False, False): "ERROR!!!",
     }
 
-    species_df["V"] = 1
     if species_df.empty:
         cells = []
     else:
-        df = species_df.unstack("Year").loc[dt.date.today().month]["V"]
+        species_df.set_index(species_df.columns.to_list(), inplace=True)
+        species_df["V"] = 1
+        df = species_df.unstack("Year").loc[current_month]["V"]
 
         li = len(df.index)
         rows = li // cols + 1 if li % cols else li // cols
@@ -455,11 +456,6 @@ def get_moth_grid(db):
 
     if len(cells) % cols:
         cells.extend([""] * (cols - (len(cells) % cols)))
-
-    # Use css grid to output  a grid rather than a table
-    # print(f"No. cells: {len(cells)}")
-    # print(f"No. Cols:  {cols}")
-    # print(f"No. Rows:  {len(cells)//cols}")
 
     css = (
         "<style>"
@@ -1112,7 +1108,7 @@ def get_summary():
         # Update catch volume graph
 
     # Generate moth_grid
-    grid_css, grid_cells = get_moth_grid(db)
+    grid_css, grid_cells = get_moth_grid()
     db.close()
     cnx.close()
 
@@ -1266,6 +1262,8 @@ def survey_handler():
         ]:
             continue
         specimens = json.loads((request.forms.get(moth)))
+        if not isinstance(specimens["count"], int):
+            continue
         if specimens["count"] <= 0:
             continue
         print(">>>>>>>>>>>>")
