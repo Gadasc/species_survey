@@ -57,6 +57,7 @@ Vue.component("options", {
             default_item: {
                 handler(val) {
                     this.update_default_value(this.option_data.name, val);
+                    if (this.default_item == "new_item") return;
                     this.$nextTick(function(){
                         this.$refs.form.submit();
                     })

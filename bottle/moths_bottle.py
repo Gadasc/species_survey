@@ -27,6 +27,7 @@ data of bio-survey.
   * Food plant correlation and prediction
 
 ### History
+    12 Sep 2020 - Fixed over eager default on options page
      6 Sep 2020 - /latest no longer highlights synonyms as FFY/NFT if TVK seen before
      6 Sep 2020 - Fixed some bugs on /latest page that showed nfy/fft in error
     31 Aug 2020 - Refactored "/latest" page to use Vue
