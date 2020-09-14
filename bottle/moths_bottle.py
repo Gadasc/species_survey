@@ -27,6 +27,7 @@ data of bio-survey.
   * Food plant correlation and prediction
 
 ### History
+    14 Sep 2020 - Started adding plotly
     12 Sep 2020 - Fixed over eager default on options page
      6 Sep 2020 - /latest no longer highlights synonyms as FFY/NFT if TVK seen before
      6 Sep 2020 - Fixed some bugs on /latest page that showed nfy/fft in error
@@ -131,6 +132,22 @@ import logging
 import logging.handlers
 from functools import wraps
 from markdown import markdown
+
+try:
+    import plotly.graph_objects as go
+except ModuleNotFoundError:
+    try:
+        import subprocess
+        import sys
+
+        def install(package):
+            subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+
+        install("plotly")
+        import plotly.graph_objects as go
+    except ModuleNotFoundError:
+        print("Still can't import plotly!!!")
+
 
 # from werkzeug.middleware.profiler import ProfilerMiddleware
 import os
@@ -604,6 +621,84 @@ def generate_cummulative_species_graph(cursor):
     plt.close()
 
 
+def graph_mothname_v3(mothname):
+    """ Using plotly return the json data for a browser rendered graph
+    """
+
+    catches_df = get_table(
+        f"""SELECT mr.Date, mr.MothCount
+        FROM (select * from {cfg['TAXONOMY_TABLE']} where MothName = "{mothname}") sp
+        JOIN {cfg['TAXONOMY_TABLE']} re
+        ON sp.TVK = re.TVK
+        JOIN moth_records mr
+        ON mr.MothName = re.MothName
+        GROUP BY mr.Date;"""
+    )
+
+    today = dt.date.today()
+    today_dt = dt.datetime.now()
+    nyd = today.replace(month=1, day=1)
+    nye = today.replace(month=12, day=31)
+    yyyy = today.year
+
+    date_year_index = pd.DatetimeIndex(pd.date_range(start=nyd, end=nye))
+
+    this_year_df = (
+        catches_df[catches_df["Date"] >= nyd]
+        .set_index("Date")
+        .reindex(date_year_index, fill_value=0)
+        .reset_index()
+    )
+    this_year_df[this_year_df["index"] > today_dt] = None
+
+    catches_df["Date"] = catches_df["Date"].map(lambda e: e.replace(year=yyyy))
+    flattened_df = catches_df.groupby("Date").mean()
+    all_catches_df = flattened_df.reindex(date_year_index, fill_value=0).reset_index()
+
+    # Render with plotly
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=all_catches_df["index"],
+            y=all_catches_df.MothCount,
+            mode="lines",
+            name="Average",
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=this_year_df["index"], y=this_year_df.MothCount, mode="lines", name="2020"
+        )
+    )
+    fig.add_shape(
+        # Line Vertical
+        dict(
+            type="line",
+            x0=today,
+            y0=0,
+            x1=today,
+            y1=1,
+            yref="paper",
+            line=dict(color="Black", width=3, dash="dot"),
+        )
+    )
+    fig.update_xaxes(
+        ticklabelmode="period",
+        dtick="M1",
+        tickformat="%b",
+        range=["2020-01-01", "2020-12-31"],
+    )
+    fig.layout.title = mothname
+    fig.layout.title.x = 0.5
+    fig.layout.yaxis.range = [0, max(all_catches_df.MothCount) * 1.1]
+    fig.layout.width = 1000
+    fig.layout.legend.x = 0.99
+    fig.layout.legend.y = 0.98
+    fig.layout.legend.xanchor = "right"
+
+    return fig.to_json()
+
+
 def graph_mothname_v2(mothname):
     start = time.time()
     query_str = f"""SELECT mr.Date, mr.MothCount
@@ -704,28 +799,28 @@ def server_graphs(species):
     return static_file(f"{species}.png", root=cfg["GRAPH_PATH"])
 
 
-@app.route("/species_")
-def species_():
-    """ Show  list of moths caught to date. """
-    sql_string = """
-        SELECT MothName Species, ceil(avg(Total)) "Annual Average"
-            FROM (
-                SELECT Year(Date) Year, MothName, Sum(MothCount) Total
-                    FROM moth_records
-                    GROUP BY Year, MothName
-            ) yt GROUP BY MothName ORDER BY avg(Total) DESC;"""
-    sql_df = get_table(sql_string)
+# @app.route("/species_")
+# def species_():
+#     """ Show  list of moths caught to date. """
+#     sql_string = """
+#         SELECT MothName Species, ceil(avg(Total)) "Annual Average"
+#             FROM (
+#                 SELECT Year(Date) Year, MothName, Sum(MothCount) Total
+#                     FROM moth_records
+#                     GROUP BY Year, MothName
+#             ) yt GROUP BY MothName ORDER BY avg(Total) DESC;"""
+#     sql_df = get_table(sql_string)
 
-    # Add links
-    sql_df["Species"] = sql_df["Species"].map(
-        lambda s: f'<a href="/species/{s}">{s}</a>', na_action="ignore"
-    )
+#     # Add links
+#     sql_df["Species"] = sql_df["Species"].map(
+#         lambda s: f'<a href="/species/{s}">{s}</a>', na_action="ignore"
+#     )
 
-    return template(
-        "species_summary.tpl",
-        title="Species Summary",
-        species_table=sql_df.to_html(escape=False, index=False, justify="left"),
-    )
+#     return template(
+#         "species_summary.tpl",
+#         title="Species Summary",
+#         species_table=sql_df.to_html(escape=False, index=False, justify="left"),
+#     )
 
 
 def get_used_names(map_tvk2mn, tvk):
@@ -759,54 +854,54 @@ def get_used_names(map_tvk2mn, tvk):
     return common_name, scientific_name
 
 
-@app.route("/species")
-def species():
-    """ Show  list of moths caught to date. """
-    # Get Avg catch per year by TVK
-    avg_per_year = get_table(
-        f"""
-            SELECT TVK, ceil(avg(Total)) "Annual Average"
-                FROM (
-                    SELECT Year(Date) Year, MothName, TVK,
-                    Sum(MothCount) Total, MothGenus, MothSpecies
-                        FROM
-                        (moth_records JOIN {cfg["TAXONOMY_TABLE"]} USING (MothName))
-                        GROUP BY Year, TVK
-                ) yt GROUP BY TVK ORDER BY avg(Total) DESC
-                ;"""
-    )
+# @app.route("/species")
+# def species():
+#     """ Show  list of moths caught to date. """
+#     # Get Avg catch per year by TVK
+#     avg_per_year = get_table(
+#         f"""
+#             SELECT TVK, ceil(avg(Total)) "Annual Average"
+#                 FROM (
+#                     SELECT Year(Date) Year, MothName, TVK,
+#                     Sum(MothCount) Total, MothGenus, MothSpecies
+#                         FROM
+#                         (moth_records JOIN {cfg["TAXONOMY_TABLE"]} USING (MothName))
+#                         GROUP BY Year, TVK
+#                 ) yt GROUP BY TVK ORDER BY avg(Total) DESC
+#                 ;"""
+#     )
 
-    # Get a map of all MothNames to TVK
-    map_tvk2m = (
-        get_table(
-            f"""SELECT MothName, TVK, MothGenus, MothSpecies FROM moth_records JOIN
-                {cfg["TAXONOMY_TABLE"]} USING (MothName) GROUP BY MothName;"""
-        )
-        .set_index("TVK")
-        .sort_index()
-    )
+#     # Get a map of all MothNames to TVK
+#     map_tvk2m = (
+#         get_table(
+#             f"""SELECT MothName, TVK, MothGenus, MothSpecies FROM moth_records JOIN
+#                 {cfg["TAXONOMY_TABLE"]} USING (MothName) GROUP BY MothName;"""
+#         )
+#         .set_index("TVK")
+#         .sort_index()
+#     )
 
-    sql_df = pd.DataFrame(
-        [
-            [*get_used_names(map_tvk2m, tvk), int(avg)]
-            for tvk, avg in zip(avg_per_year.TVK, avg_per_year["Annual Average"])
-        ],
-        columns=["Species", "Taxon", "Annual Avg."],
-    )
+#     sql_df = pd.DataFrame(
+#         [
+#             [*get_used_names(map_tvk2m, tvk), int(avg)]
+#             for tvk, avg in zip(avg_per_year.TVK, avg_per_year["Annual Average"])
+#         ],
+#         columns=["Species", "Taxon", "Annual Avg."],
+#     )
 
-    # Add links
-    sql_df["Species"] = sql_df["Species"].map(
-        lambda s: f'<a href="/species/{s}">{s}</a>', na_action="ignore"
-    )
-    sql_df["Taxon"] = sql_df["Taxon"].map(
-        lambda s: f'<a href="/species/{s}">{s}</a>', na_action="ignore"
-    )
+#     # Add links
+#     sql_df["Species"] = sql_df["Species"].map(
+#         lambda s: f'<a href="/species/{s}">{s}</a>', na_action="ignore"
+#     )
+#     sql_df["Taxon"] = sql_df["Taxon"].map(
+#         lambda s: f'<a href="/species/{s}">{s}</a>', na_action="ignore"
+#     )
 
-    return template(
-        "species_summary.tpl",
-        title="Species Summary",
-        species_table=sql_df.to_html(escape=False, index=False, justify="left"),
-    )
+#     return template(
+#         "species_summary.tpl",
+#         title="Species Summary",
+#         species_table=sql_df.to_html(escape=False, index=False, justify="left"),
+#     )
 
 
 def get_genus_list():
@@ -1126,8 +1221,61 @@ def update_mothnames():
     update_moth_taxonomy.update_mothnames()
 
 
+# @app.route("/species/<species:path>")
+# def get_species(species):
+#     """ Generate a summary page for the specified moth species.
+#         Use % as a wildcard."""
+#     print(f"Displaying: {species}")
+#     species = species.replace("%20", " ")
+#     query_str = f"""SELECT mr.Date, re.MothName, mr.MothCount, re.TVK
+#         FROM (select * from {cfg['TAXONOMY_TABLE']} where MothName = "{species}") sp
+#         JOIN {cfg['TAXONOMY_TABLE']} re
+#             ON sp.TVK = re.TVK
+#         JOIN moth_records mr
+#             ON mr.MothName = re.MothName
+#         ORDER BY mr.Date;"""
+#     all_survey_df = get_table(query_str)
+
+#     unique_species = all_survey_df["TVK"].unique()
+#     if len(unique_species) == 1:
+#         t = get_table(
+#             f"""SELECT * from {cfg["TAXONOMY_TABLE"]}
+#                 WHERE MothName like "{species}";"""
+#         ).iloc[0]
+#         taxo_str = (
+#             f'<ul style="list-style-type: none;">'
+#             f'<li><a href="/family/{t.MothFamily}">{t.MothFamily}</a></li>'
+#             f'<ul style="list-style-type: none;"><li>&#9492;{t.MothSubFamily}</li>'
+#             f'<ul style="list-style-type: none;">'
+#             f'<li>&#9492;<a href="/genus/{t.MothGenus}">{t.MothGenus}</a></li>'
+#             f'<ul style="list-style-type: none;"><li>&#9492;{t.MothSpecies}</li>'
+#             f"</ul></ul></ul></ul>"
+#         )
+
+#         # Produce a graph of these
+#         graph_date_overlay()
+#         graph_mothname_v2(species)
+
+#         table_text = all_survey_df[["Date", "MothName", "MothCount"]].to_html(
+#             escape=False, index=False
+#         )
+#         return template(
+#             "species.tpl", species=species, catches=table_text, taxonomy=taxo_str
+#         )
+#     elif len(unique_species) == 0:
+#         return template("no_records.tpl")
+#     else:
+#         # There are multiple species - so provide the choice
+#         return " ".join(
+#             [
+#                 f'<a href="/species/{specie}">{specie}</a></p>'
+#                 for specie in unique_species
+#             ]
+#         )
+
+
 @app.route("/species/<species:path>")
-def get_species(species):
+def get_pspecies(species):
     """ Generate a summary page for the specified moth species.
         Use % as a wildcard."""
     print(f"Displaying: {species}")
@@ -1137,7 +1285,8 @@ def get_species(species):
         JOIN {cfg['TAXONOMY_TABLE']} re
             ON sp.TVK = re.TVK
         JOIN moth_records mr
-            ON mr.MothName = re.MothName;"""
+            ON mr.MothName = re.MothName
+        ORDER BY mr.Date;"""
     all_survey_df = get_table(query_str)
 
     unique_species = all_survey_df["TVK"].unique()
@@ -1157,14 +1306,16 @@ def get_species(species):
         )
 
         # Produce a graph of these
-        graph_date_overlay()
-        graph_mothname_v2(species)
-
+        graph_json = graph_mothname_v3(species)
         table_text = all_survey_df[["Date", "MothName", "MothCount"]].to_html(
             escape=False, index=False
         )
         return template(
-            "species.tpl", species=species, catches=table_text, taxonomy=taxo_str
+            "pspecies.tpl",
+            species=species,
+            catches=table_text,
+            taxonomy=taxo_str,
+            plotly_data=graph_json,
         )
     elif len(unique_species) == 0:
         return template("no_records.tpl")
