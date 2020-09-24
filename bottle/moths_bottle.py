@@ -27,7 +27,7 @@ data of bio-survey.
   * Food plant correlation and prediction
 
 ### History
-    14 Sep 2020 - Started adding plotly
+    14 Sep 2020 - Started adding plotly for summary (initially 35s, subsequenc 4s)
     12 Sep 2020 - Fixed over eager default on options page
      6 Sep 2020 - /latest no longer highlights synonyms as FFY/NFT if TVK seen before
      6 Sep 2020 - Fixed some bugs on /latest page that showed nfy/fft in error
@@ -109,10 +109,6 @@ data of bio-survey.
     13 Jul 2019 - Initial trial page producing a table and graph of catches.
 
 
-
-
-[1]:/latest
-
 """
 
 from bottle import Bottle, template, static_file, TEMPLATE_PATH, request, response, run
@@ -124,9 +120,6 @@ try:
 except ModuleNotFoundError:
     from sql_config_default import sql_config
 import datetime as dt
-import matplotlib
-import matplotlib.pyplot as plt
-from matplotlib.dates import MonthLocator, DateFormatter
 import numpy as np
 import logging
 import logging.handlers
@@ -162,7 +155,9 @@ except ModuleNotFoundError:
     from app_config_default import app_config as cfg
 import update_moth_taxonomy
 
-matplotlib.use("Agg")
+pd.options.plotting.backend = "plotly"
+
+# matplotlib.use("Agg")
 TEMPLATE_PATH.insert(0, os.getcwd())  # sets the cwd for the bottle templates to work
 
 # Override the pandas' max display width to prevent to_html truncating cols
@@ -345,32 +340,32 @@ def generate_records_file(cursor, date_dash_str):
     return records_dict
 
 
-def graph_date_overlay():
-    """ Determine if the date overlay graph is old and regenerate if necessary."""
+# def graph_date_overlay():
+#     """ Determine if the date overlay graph is old and regenerate if necessary."""
 
-    today = dt.date.today()
-    try:
-        if (
-            dt.date.fromtimestamp(
-                os.path.getmtime(cfg["GRAPH_PATH"] + cfg["OVERLAY_FILE"])
-            )
-            == today
-        ):
-            moth_logger.debug("Today's overlay exists - returning.")
-            return
-    except FileNotFoundError:
-        pass
+#     today = dt.date.today()
+#     try:
+#         if (
+#             dt.date.fromtimestamp(
+#                 os.path.getmtime(cfg["GRAPH_PATH"] + cfg["OVERLAY_FILE"])
+#             )
+#             == today
+#         ):
+#             moth_logger.debug("Today's overlay exists - returning.")
+#             return
+#     except FileNotFoundError:
+#         pass
 
-    fig = plt.figure(**plot_dict)
-    ax = fig.add_subplot(111)
-    ax.set_xlim(today.replace(month=1, day=1), today.replace(month=12, day=31))
-    ax.xaxis.set_major_locator(MonthLocator())
-    ax.xaxis.set_major_formatter(DateFormatter("%b"))
-    plt.setp(ax.xaxis.get_majorticklabels(), ha="left")
-    ax.axvline(today, color="grey", linestyle="--")
-    plt.axis("off")
-    plt.savefig(GRAPH_PATH + OVERLAY_FILE, transparent=True)
-    plt.close()
+#     fig = plt.figure(**plot_dict)
+#     ax = fig.add_subplot(111)
+#     ax.set_xlim(today.replace(month=1, day=1), today.replace(month=12, day=31))
+#     ax.xaxis.set_major_locator(MonthLocator())
+#     ax.xaxis.set_major_formatter(DateFormatter("%b"))
+#     plt.setp(ax.xaxis.get_majorticklabels(), ha="left")
+#     ax.axvline(today, color="grey", linestyle="--")
+#     plt.axis("off")
+#     plt.savefig(GRAPH_PATH + OVERLAY_FILE, transparent=True)
+#     plt.close()
 
 
 def _get_file_update_time(fname: str) -> dt.datetime:
@@ -485,14 +480,15 @@ def get_moth_grid():
     return css, "".join(cells)
 
 
-def generate_monthly_species(cursor):
+def generate_monthly_species(cursor=None):
     """ Called from
         /summary route
         get_summary() """
     this_year = dt.date.today().year
 
     moth_logger.debug(f"Creating by monthly chart")
-    sql_species_name_by_month_year = """
+    pre_species_df = get_table(
+        """
         SELECT tw.Year, tw.Month, tw.MothName
         FROM (
             SELECT year(Date) Year, month(Date) Month, MothName
@@ -501,80 +497,64 @@ def generate_monthly_species(cursor):
             GROUP BY Year, Month, MothName
         ) tw
         GROUP BY Year, Month, MothName;"""
+    )
 
-    cursor.execute(sql_species_name_by_month_year)
-    data_list = [list(c) for c in cursor]
-    pre_species_df = pd.DataFrame(data_list, columns=list(cursor.column_names))
-    pre_species_df["V"] = 1
-    moth_logger.debug(pre_species_df)
-
-    # If the data is empty create a dummy entry
     if pre_species_df.empty:
-        species_df = (
-            pd.DataFrame(
-                {"Month": [1], "Year": [this_year], "MothName": ["Ano"], "V": 0}
-            )
-            .set_index(["Month", "Year", "MothName"])
-            .unstack(["Year", "MothName"])["V"]
-        )
-    else:
-        species_df = pre_species_df.set_index(["Month", "Year", "MothName"]).unstack(
-            ["Year", "MothName"]
-        )["V"]
+        pre_species_df = pd.DataFrame(
+            {"Month": range(1, 13), "Year": [this_year] * 12, "MothName": [None] * 12}
+        ).set_index("Month")
+
+    # Count each species per Month-Year
+    g = pre_species_df.groupby(["Year", "Month"])
+    by_month_df = g.count().unstack("Year")["MothName"]
+    by_month_df = by_month_df.reindex(range(1, 13), fill_value=0)
+
+    # Find all species caught in a month regardless of year
+    gm = pre_species_df.groupby(["Month", "MothName"])
+    by_all_df = gm.count().unstack("MothName").count(axis="columns")
 
     x_labels = [dt.date(2019, mn, 1).strftime("%b") for mn in range(1, 13)]
 
     # Create chart
-    fig = plt.figure(**plot_dict)
-    ax = fig.add_subplot(111)
-
-    month_index = list(range(1, 13))
-    ax.bar(
-        x_labels,
-        species_df.any(axis="columns", level=1)
-        .sum(axis="columns")
-        .reindex(index=month_index, fill_value=0)
-        .values,
-        color="#909090",
-        label="All",
+    fig = go.Figure()
+    fig.add_trace(go.Bar(x=x_labels, y=by_all_df, marker_color="#909090", name="All"))
+    fig.add_trace(
+        go.Bar(
+            x=x_labels,
+            y=by_month_df[this_year],
+            width=0.5,
+            marker_color="blue",
+            name=this_year,
+        )
     )
-    ax.bar(
-        x_labels,
-        species_df[this_year]
-        .sum(axis="columns")
-        .reindex(index=month_index, fill_value=0),
-        width=0.5,
-        color="b",
-        label=this_year,
-    )
-    ax.legend()
+    fig.update_layout(barmode="overlay")
+    fig.layout.legend.x = 0.99
+    fig.layout.legend.y = 0.98
+    fig.layout.legend.xanchor = "right"
+    fig.layout.width = 1000
+    fig.layout.height = 450
+    fig.update_xaxes(title=None)
+    fig.update_yaxes(title=None)
 
-    plt.savefig(f"{cfg['GRAPH_PATH']}{cfg['BY_MONTH_GRAPH']}")
-    plt.close()
-
-    moth_logger.debug(f"Generated species by month graph")
+    return fig.to_json()
 
 
-def generate_cummulative_species_graph(cursor):
+def generate_cummulative_species_graph(cursor=None):
     """ Called from get_summary """
     today = dt.date.today()
 
     # Update species graph
-    cursor.execute(
+    cum_species = get_table(
         "SELECT year(Date) Year, Date, MothName "
         "FROM moth_records WHERE MothName IS NOT NULL;"
     )
-    cum_species = pd.DataFrame(
-        [list(c) for c in cursor], columns=list(cursor.column_names)
-    )
+
     cum_species["Catch"] = 1
     cum_species["Date"] = cum_species["Date"].map(
         lambda dd: dd.replace(year=today.year)
     )
     cum_species.set_index(["Year", "Date", "MothName"], inplace=True)
-    print("DEBUG")
-    print(cum_species)
-    cum_species.to_csv("CumSpeciesDebug.csv")
+
     if cum_species.empty:
         # If dataframe is empty...
         cum_results = pd.DataFrame(
@@ -607,18 +587,23 @@ def generate_cummulative_species_graph(cursor):
     cum_results.loc[today.year].mask(
         cum_results.columns > str(today), other=np.NaN, inplace=True
     )
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    ax = cum_results.transpose().plot(
-        marker="", linestyle="-", label="Species Total", **plot_dict
-    )
-    ax.xaxis.set_major_locator(MonthLocator())
-    ax.xaxis.set_major_formatter(DateFormatter("%b"))
-    ax.set_xlim([today.replace(month=1, day=1), today.replace(month=12, day=30)])
 
-    # cum_results.transpose().plot()
-    plt.savefig(f"{cfg['GRAPH_PATH']}{cfg['CUM_SPECIES_GRAPH']}")
-    plt.close()
+    # Generate cumulative species graph
+    # Create chart
+    fig = cum_results.transpose().plot()
+    fig.layout.legend.x = 0.01
+    fig.layout.legend.y = 0.98
+    fig.layout.legend.xanchor = "left"
+    fig.update_xaxes(
+        # ticklabelmode="period",
+        dtick="M1",
+        tickformat="%b",
+        range=[f"{today.year}-01-01", f"{today.year}-12-31"],
+    )
+    fig.layout.width = 1000
+    fig.layout.height = 450
+
+    return fig.to_json()
 
 
 def graph_mothname_v3(mothname):
@@ -686,7 +671,7 @@ def graph_mothname_v3(mothname):
         ticklabelmode="period",
         dtick="M1",
         tickformat="%b",
-        range=["2020-01-01", "2020-12-31"],
+        range=[f"{yyyy}-01-01", f"{yyyy}-12-31"],
     )
     fig.layout.title = mothname
     fig.layout.title.x = 0.5
@@ -699,95 +684,6 @@ def graph_mothname_v3(mothname):
     return fig.to_json()
 
 
-def graph_mothname_v2(mothname):
-    start = time.time()
-    query_str = f"""SELECT mr.Date, mr.MothCount
-        FROM (select * from {cfg['TAXONOMY_TABLE']} where MothName = "{mothname}") sp
-        JOIN {cfg['TAXONOMY_TABLE']} re
-        ON sp.TVK = re.TVK
-        JOIN moth_records mr
-        ON mr.MothName = re.MothName
-        GROUP BY mr.Date;"""
-    catches_df = get_table(query_str)
-    print(">>> 1st table done: ", time.time() - start)
-    # Test results
-    moth_logger.debug(f"Most recent catch date: {catches_df.Date.max()}")
-    try:
-        moth_logger.debug(
-            f"{mothname}.png last modified: "
-            f'{dt.date.fromtimestamp(os.path.getmtime(f"{GRAPH_PATH}{mothname}.png"))}'
-        )
-    except FileNotFoundError:
-        moth_logger.debug(f"{mothname}.png missing!")
-
-    try:
-        if catches_df.Date.max() < dt.date.fromtimestamp(
-            os.path.getmtime(f"{GRAPH_PATH}{mothname}.png")
-        ):
-            moth_logger.debug(f"File is new enough. Not updating {mothname}")
-            return
-    except FileNotFoundError:
-        moth_logger.debug(
-            f"Unable to find {GRAPH_PATH}{mothname}.png so will create it."
-        )
-
-    # If a moth was caught today the graph will be updated.
-    # So find out if the graph is newer than the last database update,
-    # if so we don't recreate
-    today = dt.date.today()
-    try:
-        file_update_time = dt.datetime.fromtimestamp(
-            os.path.getmtime(f"{GRAPH_PATH}{mothname}.png")
-        )
-        moth_logger.debug(f"File: {mothname}.png was updated: {file_update_time}")
-        db_update_time = get_db_update_time()
-        moth_logger.debug(f"Database:            was updated: {db_update_time}")
-        if file_update_time > db_update_time:
-            return
-    except (FileNotFoundError, TypeError):
-        moth_logger.debug("File still not found")
-
-    moth_logger.debug(f"Generating graph: {GRAPH_PATH}{mothname}.png")
-    print(">>> 2 decission made: ", time.time() - start)
-    date_year_index = pd.DatetimeIndex(
-        pd.date_range(
-            start=today.replace(month=1, day=1), end=today.replace(month=12, day=31)
-        )
-    )
-
-    this_year_df = (
-        catches_df[catches_df["Date"] >= today.replace(month=1, day=1)]
-        .set_index("Date")
-        .reindex(date_year_index, fill_value=0)
-        .reset_index()
-    )
-
-    catches_df["Date"] = [d.replace(year=today.year) for d in catches_df["Date"]]
-    flattened_df = catches_df.groupby("Date").mean()
-
-    all_catches_df = flattened_df.reindex(date_year_index, fill_value=0).reset_index()
-    x = all_catches_df.values[:, 0]
-    y_all = all_catches_df.values[:, 1]
-    y_this = this_year_df.values[:, 1]
-    # moth_logger.debug(str(plot_dict))
-    fig = plt.figure(**plot_dict)
-    ax = fig.add_subplot(111)
-    ax.set_title(mothname)
-
-    # moth_logger.debug(x)
-    ax.plot(x, y_all, label="Average")
-    ax.plot(x, y_this, "r", label=str(today.year))
-    ax.legend()
-    ax.set_xlim(all_catches_df.values[0, 0], all_catches_df.values[-1, 0])
-    ax.set_ylim(bottom=0)
-    ax.xaxis.set_major_locator(MonthLocator())
-    ax.xaxis.set_major_formatter(DateFormatter("%b"))
-    plt.setp(ax.xaxis.get_majorticklabels(), ha="left")
-    plt.savefig(f"{GRAPH_PATH}{mothname}.png")
-    plt.close()
-    print(">>> 3 graph done: ", time.time() - start)
-
-
 app = Bottle()
 app.install(log_to_logger)  # Logs html requests to a file
 
@@ -797,30 +693,6 @@ def server_graphs(species):
     """ Helper route to return a graph image as a static file. """
     species = species.replace("%20", " ")
     return static_file(f"{species}.png", root=cfg["GRAPH_PATH"])
-
-
-# @app.route("/species_")
-# def species_():
-#     """ Show  list of moths caught to date. """
-#     sql_string = """
-#         SELECT MothName Species, ceil(avg(Total)) "Annual Average"
-#             FROM (
-#                 SELECT Year(Date) Year, MothName, Sum(MothCount) Total
-#                     FROM moth_records
-#                     GROUP BY Year, MothName
-#             ) yt GROUP BY MothName ORDER BY avg(Total) DESC;"""
-#     sql_df = get_table(sql_string)
-
-#     # Add links
-#     sql_df["Species"] = sql_df["Species"].map(
-#         lambda s: f'<a href="/species/{s}">{s}</a>', na_action="ignore"
-#     )
-
-#     return template(
-#         "species_summary.tpl",
-#         title="Species Summary",
-#         species_table=sql_df.to_html(escape=False, index=False, justify="left"),
-#     )
 
 
 def get_used_names(map_tvk2mn, tvk):
@@ -852,56 +724,6 @@ def get_used_names(map_tvk2mn, tvk):
         assert False, "Panic!!!"
 
     return common_name, scientific_name
-
-
-# @app.route("/species")
-# def species():
-#     """ Show  list of moths caught to date. """
-#     # Get Avg catch per year by TVK
-#     avg_per_year = get_table(
-#         f"""
-#             SELECT TVK, ceil(avg(Total)) "Annual Average"
-#                 FROM (
-#                     SELECT Year(Date) Year, MothName, TVK,
-#                     Sum(MothCount) Total, MothGenus, MothSpecies
-#                         FROM
-#                         (moth_records JOIN {cfg["TAXONOMY_TABLE"]} USING (MothName))
-#                         GROUP BY Year, TVK
-#                 ) yt GROUP BY TVK ORDER BY avg(Total) DESC
-#                 ;"""
-#     )
-
-#     # Get a map of all MothNames to TVK
-#     map_tvk2m = (
-#         get_table(
-#             f"""SELECT MothName, TVK, MothGenus, MothSpecies FROM moth_records JOIN
-#                 {cfg["TAXONOMY_TABLE"]} USING (MothName) GROUP BY MothName;"""
-#         )
-#         .set_index("TVK")
-#         .sort_index()
-#     )
-
-#     sql_df = pd.DataFrame(
-#         [
-#             [*get_used_names(map_tvk2m, tvk), int(avg)]
-#             for tvk, avg in zip(avg_per_year.TVK, avg_per_year["Annual Average"])
-#         ],
-#         columns=["Species", "Taxon", "Annual Avg."],
-#     )
-
-#     # Add links
-#     sql_df["Species"] = sql_df["Species"].map(
-#         lambda s: f'<a href="/species/{s}">{s}</a>', na_action="ignore"
-#     )
-#     sql_df["Taxon"] = sql_df["Taxon"].map(
-#         lambda s: f'<a href="/species/{s}">{s}</a>', na_action="ignore"
-#     )
-
-#     return template(
-#         "species_summary.tpl",
-#         title="Species Summary",
-#         species_table=sql_df.to_html(escape=False, index=False, justify="left"),
-#     )
 
 
 def get_genus_list():
@@ -1006,14 +828,36 @@ def get_genus(genus=None):
     )
 
     table_df["Mean"] = table_df.mean(axis="columns")
-    ax = table_df.reindex(date_year_index).fillna(0)[legend].plot(**plot_dict)
-    ax.set_title(f"Genus:{genus}")
-    ax.set_ylim(bottom=0)
-    plt.savefig(f"{GRAPH_PATH}{genus}.png")
-    plt.close()
+    fig = table_df.reindex(date_year_index).fillna(0)[legend].plot()
+    fig.add_shape(
+        # Line Vertical
+        dict(
+            type="line",
+            x0=today,
+            y0=0,
+            x1=today,
+            y1=1,
+            yref="paper",
+            line=dict(color="Black", width=3, dash="dot"),
+        )
+    )
+    fig.update_xaxes(
+        ticklabelmode="period",
+        dtick="M1",
+        tickformat="%b",
+        range=[f"{this_year}-01-01", f"{this_year}-12-31"],
+    )
+    fig.layout.title = genus
+    fig.layout.title.x = 0.5
+    fig.update_yaxes(rangemode="tozero")
+    fig.layout.width = 1000
+    fig.layout.height = 450
 
     return template(
-        "genus_summary.tpl", genus=genus, species=catches_df.MothName.unique()
+        "genus_summary.tpl",
+        genus=genus,
+        species=catches_df.MothName.unique(),
+        gg=fig.to_json(),
     )
 
 
@@ -1063,14 +907,38 @@ def get_family(family=None):
     )
 
     table_df["Mean"] = table_df.mean(axis="columns")
-    ax = table_df.reindex(date_year_index).fillna(0)[legend].plot(**plot_dict)
-    ax.set_title(f"Family:{family}")
-    ax.set_ylim(bottom=0)
-    plt.savefig(f"{GRAPH_PATH}{family}.png")
-    plt.close()
+    fig = table_df.reindex(date_year_index).fillna(0)[legend].plot()
+    fig.add_shape(
+        # Line Vertical
+        dict(
+            type="line",
+            x0=today,
+            y0=0,
+            x1=today,
+            y1=1,
+            yref="paper",
+            line=dict(color="Black", width=3, dash="dot"),
+        )
+    )
+    fig.update_xaxes(
+        ticklabelmode="period",
+        dtick="M1",
+        tickformat="%b",
+        range=[f"{this_year}-01-01", f"{this_year}-12-31"],
+    )
+    fig.layout.title = family
+    fig.layout.title.x = 0.5
+    fig.update_xaxes(title=None)
+    fig.update_yaxes(title=None)
+    fig.update_yaxes(rangemode="tozero")
+    fig.layout.width = 1000
+    fig.layout.height = 450
 
     return template(
-        "family_summary.tpl", family=family, species=catches_df.MothName.unique()
+        "family_summary.tpl",
+        family=family,
+        species=catches_df.MothName.unique(),
+        fg=fig.to_json(),
     )
 
 
@@ -1172,44 +1040,18 @@ def serve_survey2(dash_date_str=None):
 @app.route("/summary")
 def get_summary():
     """ Display an overall summary for the Moths web-site. """
-    create_graphs = False
 
-    # Determine if summary graph is out of date
-    # MariaDB will give the last update time, while MySQL doesn't.
-    # So we will use the locally stored records and compare to the timestamp of the file
-    try:
-        db_update_time = get_db_update_time()
-        summary_graph_time = _get_file_update_time(
-            f"{cfg['GRAPH_PATH']}{cfg['CUM_SPECIES_GRAPH']}.png"
-        )
-        create_graphs = db_update_time > summary_graph_time
-
-    except FileNotFoundError:
-        create_graphs = True
-
-    cnx = mariadb.connect(**sql_config)
-    db = cnx.cursor()
-    if create_graphs:
-        moth_logger.debug(
-            f"DB updated since last summary graph update "
-            f"{summary_graph_time}. \n"
-            f"Updating summary graph"
-        )
-        generate_cummulative_species_graph(db)
-
-        # Update catch diversity graph
-        generate_monthly_species(db)
-
-        # Update catch volume graph
+    csg = generate_cummulative_species_graph()
+    bmg = generate_monthly_species()
 
     # Generate moth_grid
     grid_css, grid_cells = get_moth_grid()
-    db.close()
-    cnx.close()
 
     return template(
         "summary.tpl",
+        summary_graph_json=csg,
         summary_image_file=cfg["GRAPH_PATH"] + cfg["CUM_SPECIES_GRAPH"],
+        by_month_graph_json=bmg,
         by_month_image_file=f"{cfg['GRAPH_PATH']}{cfg['BY_MONTH_GRAPH']}",
         moth_grid_css=grid_css,
         moth_grid_cells=grid_cells,
@@ -1219,59 +1061,6 @@ def get_summary():
 @app.route("/update_mothnames")
 def update_mothnames():
     update_moth_taxonomy.update_mothnames()
-
-
-# @app.route("/species/<species:path>")
-# def get_species(species):
-#     """ Generate a summary page for the specified moth species.
-#         Use % as a wildcard."""
-#     print(f"Displaying: {species}")
-#     species = species.replace("%20", " ")
-#     query_str = f"""SELECT mr.Date, re.MothName, mr.MothCount, re.TVK
-#         FROM (select * from {cfg['TAXONOMY_TABLE']} where MothName = "{species}") sp
-#         JOIN {cfg['TAXONOMY_TABLE']} re
-#             ON sp.TVK = re.TVK
-#         JOIN moth_records mr
-#             ON mr.MothName = re.MothName
-#         ORDER BY mr.Date;"""
-#     all_survey_df = get_table(query_str)
-
-#     unique_species = all_survey_df["TVK"].unique()
-#     if len(unique_species) == 1:
-#         t = get_table(
-#             f"""SELECT * from {cfg["TAXONOMY_TABLE"]}
-#                 WHERE MothName like "{species}";"""
-#         ).iloc[0]
-#         taxo_str = (
-#             f'<ul style="list-style-type: none;">'
-#             f'<li><a href="/family/{t.MothFamily}">{t.MothFamily}</a></li>'
-#             f'<ul style="list-style-type: none;"><li>&#9492;{t.MothSubFamily}</li>'
-#             f'<ul style="list-style-type: none;">'
-#             f'<li>&#9492;<a href="/genus/{t.MothGenus}">{t.MothGenus}</a></li>'
-#             f'<ul style="list-style-type: none;"><li>&#9492;{t.MothSpecies}</li>'
-#             f"</ul></ul></ul></ul>"
-#         )
-
-#         # Produce a graph of these
-#         graph_date_overlay()
-#         graph_mothname_v2(species)
-
-#         table_text = all_survey_df[["Date", "MothName", "MothCount"]].to_html(
-#             escape=False, index=False
-#         )
-#         return template(
-#             "species.tpl", species=species, catches=table_text, taxonomy=taxo_str
-#         )
-#     elif len(unique_species) == 0:
-#         return template("no_records.tpl")
-#     else:
-#         # There are multiple species - so provide the choice
-#         return " ".join(
-#             [
-#                 f'<a href="/species/{specie}">{specie}</a></p>'
-#                 for specie in unique_species
-#             ]
-#         )
 
 
 @app.route("/species/<species:path>")
