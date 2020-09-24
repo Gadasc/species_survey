@@ -1063,6 +1063,56 @@ def update_mothnames():
     update_moth_taxonomy.update_mothnames()
 
 
+@app.route("/species")
+def species():
+    """ Show  list of moths caught to date. """
+    # Get Avg catch per year by TVK
+    avg_per_year = get_table(
+        f"""
+            SELECT TVK, ceil(avg(Total)) "Annual Average"
+                FROM (
+                    SELECT Year(Date) Year, MothName, TVK,
+                    Sum(MothCount) Total, MothGenus, MothSpecies
+                        FROM
+                        (moth_records JOIN {cfg["TAXONOMY_TABLE"]} USING (MothName))
+                        GROUP BY Year, TVK
+                ) yt GROUP BY TVK ORDER BY avg(Total) DESC
+                ;"""
+    )
+
+    # Get a map of all MothNames to TVK
+    map_tvk2m = (
+        get_table(
+            f"""SELECT MothName, TVK, MothGenus, MothSpecies FROM moth_records JOIN
+                {cfg["TAXONOMY_TABLE"]} USING (MothName) GROUP BY MothName;"""
+        )
+        .set_index("TVK")
+        .sort_index()
+    )
+
+    sql_df = pd.DataFrame(
+        [
+            [*get_used_names(map_tvk2m, tvk), int(avg)]
+            for tvk, avg in zip(avg_per_year.TVK, avg_per_year["Annual Average"])
+        ],
+        columns=["Species", "Taxon", "Annual Avg."],
+    )
+
+    # Add links
+    sql_df["Species"] = sql_df["Species"].map(
+        lambda s: f'<a href="/species/{s}">{s}</a>', na_action="ignore"
+    )
+    sql_df["Taxon"] = sql_df["Taxon"].map(
+        lambda s: f'<a href="/species/{s}">{s}</a>', na_action="ignore"
+    )
+
+    return template(
+        "species_summary.tpl",
+        title="Species Summary",
+        species_table=sql_df.to_html(escape=False, index=False, justify="left"),
+    )
+
+
 @app.route("/species/<species:path>")
 def get_pspecies(species):
     """ Generate a summary page for the specified moth species.
