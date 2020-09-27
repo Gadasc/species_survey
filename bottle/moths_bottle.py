@@ -27,6 +27,7 @@ data of bio-survey.
   * Food plant correlation and prediction
 
 ### History
+    27 Sep 2020 - Finshed adding plotly summary is no 24s.
     14 Sep 2020 - Started adding plotly for summary (initially 35s, subsequenc 4s)
     12 Sep 2020 - Fixed over eager default on options page
      6 Sep 2020 - /latest no longer highlights synonyms as FFY/NFT if TVK seen before
