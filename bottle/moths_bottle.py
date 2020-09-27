@@ -157,7 +157,24 @@ import update_moth_taxonomy
 
 pd.options.plotting.backend = "plotly"
 
-# matplotlib.use("Agg")
+# Set up plotly them
+this_year = dt.date.today().year
+line_layout = go.Layout(
+    autosize=False,
+    width=1000,
+    height=450,
+    title=dict(x=0, font=dict(size=32)),
+    yaxis=dict(rangemode="tozero", title={"text": ""}),
+    xaxis=dict(
+        dtick="M1",
+        tickformat="%b",
+        range=[f"{this_year}-01-01", f"{this_year}-12-31"],
+        title={"text": ""},
+    ),
+    plot_bgcolor="#f8f8f8",
+)
+
+
 TEMPLATE_PATH.insert(0, os.getcwd())  # sets the cwd for the bottle templates to work
 
 # Override the pandas' max display width to prevent to_html truncating cols
@@ -338,34 +355,6 @@ def generate_records_file(cursor, date_dash_str):
     ) as json_out:
         json_out.write(json.dumps(records_dict))
     return records_dict
-
-
-# def graph_date_overlay():
-#     """ Determine if the date overlay graph is old and regenerate if necessary."""
-
-#     today = dt.date.today()
-#     try:
-#         if (
-#             dt.date.fromtimestamp(
-#                 os.path.getmtime(cfg["GRAPH_PATH"] + cfg["OVERLAY_FILE"])
-#             )
-#             == today
-#         ):
-#             moth_logger.debug("Today's overlay exists - returning.")
-#             return
-#     except FileNotFoundError:
-#         pass
-
-#     fig = plt.figure(**plot_dict)
-#     ax = fig.add_subplot(111)
-#     ax.set_xlim(today.replace(month=1, day=1), today.replace(month=12, day=31))
-#     ax.xaxis.set_major_locator(MonthLocator())
-#     ax.xaxis.set_major_formatter(DateFormatter("%b"))
-#     plt.setp(ax.xaxis.get_majorticklabels(), ha="left")
-#     ax.axvline(today, color="grey", linestyle="--")
-#     plt.axis("off")
-#     plt.savefig(GRAPH_PATH + OVERLAY_FILE, transparent=True)
-#     plt.close()
 
 
 def _get_file_update_time(fname: str) -> dt.datetime:
@@ -591,18 +580,11 @@ def generate_cummulative_species_graph(cursor=None):
     # Generate cumulative species graph
     # Create chart
     fig = cum_results.transpose().plot()
+    fig.update_layout(title="Cummulative Species")
     fig.layout.legend.x = 0.01
     fig.layout.legend.y = 0.98
     fig.layout.legend.xanchor = "left"
-    fig.update_xaxes(
-        # ticklabelmode="period",
-        dtick="M1",
-        tickformat="%b",
-        range=[f"{today.year}-01-01", f"{today.year}-12-31"],
-    )
-    fig.layout.width = 1000
-    fig.layout.height = 450
-
+    fig.update_layout(line_layout)  # line_graph_theme
     return fig.to_json()
 
 
@@ -667,19 +649,12 @@ def graph_mothname_v3(mothname):
             line=dict(color="Black", width=3, dash="dot"),
         )
     )
-    fig.update_xaxes(
-        ticklabelmode="period",
-        dtick="M1",
-        tickformat="%b",
-        range=[f"{yyyy}-01-01", f"{yyyy}-12-31"],
-    )
+
     fig.layout.title = mothname
-    fig.layout.title.x = 0.5
-    fig.layout.yaxis.range = [0, max(all_catches_df.MothCount) * 1.1]
-    fig.layout.width = 1000
     fig.layout.legend.x = 0.99
     fig.layout.legend.y = 0.98
     fig.layout.legend.xanchor = "right"
+    fig.update_layout(line_layout)
 
     return fig.to_json()
 
@@ -848,10 +823,7 @@ def get_genus(genus=None):
         range=[f"{this_year}-01-01", f"{this_year}-12-31"],
     )
     fig.layout.title = genus
-    fig.layout.title.x = 0.5
-    fig.update_yaxes(rangemode="tozero")
-    fig.layout.width = 1000
-    fig.layout.height = 450
+    fig.update_layout(line_layout)
 
     return template(
         "genus_summary.tpl",
@@ -927,12 +899,7 @@ def get_family(family=None):
         range=[f"{this_year}-01-01", f"{this_year}-12-31"],
     )
     fig.layout.title = family
-    fig.layout.title.x = 0.5
-    fig.update_xaxes(title=None)
-    fig.update_yaxes(title=None)
-    fig.update_yaxes(rangemode="tozero")
-    fig.layout.width = 1000
-    fig.layout.height = 450
+    fig.update_layout(line_layout)
 
     return template(
         "family_summary.tpl",
