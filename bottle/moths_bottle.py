@@ -27,6 +27,7 @@ data of bio-survey.
   * Food plant correlation and prediction
 
 ### History
+    29 Sep 2020 - Implementing a cache on the graphs
     27 Sep 2020 - Finshed adding plotly summary is no 24s.
     14 Sep 2020 - Started adding plotly for summary (initially 35s, subsequenc 4s)
     12 Sep 2020 - Fixed over eager default on options page
@@ -124,7 +125,7 @@ import datetime as dt
 import numpy as np
 import logging
 import logging.handlers
-from functools import wraps
+from functools import wraps, lru_cache
 from markdown import markdown
 
 try:
@@ -1006,6 +1007,7 @@ def serve_survey2(dash_date_str=None):
 
 
 @app.route("/summary")
+@lru_cache(maxsize=3)
 def get_summary():
     """ Display an overall summary for the Moths web-site. """
 
@@ -1082,6 +1084,7 @@ def species():
 
 
 @app.route("/species/<species:path>")
+@lru_cache
 def get_pspecies(species):
     """ Generate a summary page for the specified moth species.
         Use % as a wildcard."""
@@ -1224,10 +1227,7 @@ def survey_handler():
             continue
         if specimens["count"] <= 0:
             continue
-        print(">>>>>>>>>>>>")
-        print(type(specimens))
-        print(specimens)
-        print(">>>>>>>>>>>>")
+
         specimens["recorder"] = specimens["recorder"] or default_recorder
         specimens["trap"] = specimens["trap"] or default_trap
         specimens["location"] = specimens["location"] or default_location
@@ -1245,6 +1245,10 @@ def survey_handler():
     cursor = cnx.cursor()
     update_moth_database(cursor, date_string, results_dict)
     cnx.close()
+
+    # Clear species cache
+    get_pspecies.cache_clear()
+    get_summary.cache_clear()
 
     # If the date string is today-return recent catches page,
     # otherwise show data entry for the next day
