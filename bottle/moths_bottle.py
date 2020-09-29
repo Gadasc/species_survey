@@ -1084,7 +1084,7 @@ def species():
 
 
 @app.route("/species/<species:path>")
-@lru_cache
+@lru_cache(maxsize=16)
 def get_pspecies(species):
     """ Generate a summary page for the specified moth species.
         Use % as a wildcard."""
