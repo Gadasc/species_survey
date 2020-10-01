@@ -112,21 +112,23 @@ data of bio-survey.
 
 
 """
-
-from bottle import Bottle, template, static_file, TEMPLATE_PATH, request, response, run
-import pandas as pd
-import mysql.connector as mariadb
-
-try:
-    from sql_config_local import sql_config
-except ModuleNotFoundError:
-    from sql_config_default import sql_config
+import os
+import json
+import html
+import time
+import re
 import datetime as dt
-import numpy as np
 import logging
 import logging.handlers
 from functools import wraps, lru_cache
 from markdown import markdown
+
+import numpy as np
+from bottle import Bottle, template, static_file, TEMPLATE_PATH, request, response, run
+import pandas as pd
+import mysql.connector as mariadb
+
+# from werkzeug.middleware.profiler import ProfilerMiddleware
 
 try:
     import plotly.graph_objects as go
@@ -143,14 +145,10 @@ except ModuleNotFoundError:
     except ModuleNotFoundError:
         print("Still can't import plotly!!!")
 
-
-# from werkzeug.middleware.profiler import ProfilerMiddleware
-import os
-import json
-import html
-import time
-import re
-
+try:
+    from sql_config_local import sql_config
+except ModuleNotFoundError:
+    from sql_config_default import sql_config
 try:
     from app_config_local import app_config as cfg
 except ModuleNotFoundError:
@@ -159,7 +157,7 @@ import update_moth_taxonomy
 
 pd.options.plotting.backend = "plotly"
 
-# Set up plotly them
+# Set up plotly theme
 this_year = dt.date.today().year
 line_layout = go.Layout(
     autosize=False,
@@ -176,18 +174,10 @@ line_layout = go.Layout(
     plot_bgcolor="#f8f8f8",
 )
 
-
 TEMPLATE_PATH.insert(0, os.getcwd())  # sets the cwd for the bottle templates to work
 
 # Override the pandas' max display width to prevent to_html truncating cols
 pd.set_option("display.max_colwidth", None)
-
-# Format information for plot
-plot_dict = {"figsize": (10, 4.5)}
-
-GRAPH_PATH = cfg["GRAPH_PATH"]
-OVERLAY_FILE = cfg["OVERLAY_FILE"]
-STATIC_PATH = cfg["STATIC_PATH"]
 
 # Collect the logging set up into a common file.
 moth_logger = logging.getLogger("moth_logger")
