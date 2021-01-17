@@ -596,7 +596,6 @@ def graph_mothname_v3(mothname):
     )
 
     today = dt.date.today()
-    today_dt = dt.datetime.now()
     nyd = today.replace(month=1, day=1)
     nye = today.replace(month=12, day=31)
 
@@ -606,14 +605,13 @@ def graph_mothname_v3(mothname):
         )
     )
 
+    this_year_df = catches_df[catches_df["Date"] >= nyd]
+    this_year_df["Date"] = this_year_df["Date"].map(lambda e: e.replace(year=BASE_YEAR))
     this_year_df = (
-        catches_df[catches_df["Date"] >= nyd]
-        .set_index("Date")
+        this_year_df.set_index("Date")
         .reindex(date_year_index, fill_value=0)
         .reset_index()
     )
-    print(this_year_df.head(15))
-    this_year_df[this_year_df["index"] > today_dt] = None
 
     catches_df["Date"] = catches_df["Date"].map(lambda e: e.replace(year=BASE_YEAR))
     flattened_df = catches_df.groupby("Date").mean()
@@ -790,8 +788,8 @@ def get_genus(genus=None):
     catches_df["Date"] = catches_df.Date.apply(lambda d: d.replace(year=BASE_YEAR))
 
     legend = ["Mean"]
-    if this_year in catches_df.Year:
-        legend += [f"{this_year}"]
+    if this_year in catches_df.Year.unique():
+        legend += [this_year]
 
     table_df = (
         catches_df.drop(["MothName", "MothGenus"], "columns")
@@ -867,8 +865,9 @@ def get_family(family=None):
     catches_df["Date"] = catches_df.Date.apply(lambda d: d.replace(year=BASE_YEAR))
 
     legend = ["Mean"]
-    if this_year in catches_df.Year:
-        legend += [f"{this_year}"]
+    print(catches_df.Year)
+    if this_year in catches_df.Year.unique():
+        legend += [this_year]
 
     table_df = (
         catches_df.drop(["MothName", "MothFamily"], "columns")
