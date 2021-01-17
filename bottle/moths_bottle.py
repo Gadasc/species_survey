@@ -567,7 +567,9 @@ def generate_cummulative_species_graph(cursor=None):
     # Mask future dates to avoid plotting a horizontal line to eoy
     if today.year in cum_results.index:
         cum_results.loc[today.year].mask(
-            cum_results.columns > str(today), other=np.NaN, inplace=True
+            cum_results.columns > str(today.replace(year=BASE_YEAR)),
+            other=np.NaN,
+            inplace=True,
         )
     # Generate cumulative species graph
     # Create chart
