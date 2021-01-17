@@ -156,6 +156,7 @@ except ModuleNotFoundError:
 import update_moth_taxonomy
 
 pd.options.plotting.backend = "plotly"
+BASE_YEAR = 2000  # Needs to be a leap year so we can map all days onto the same graph
 
 # Set up plotly theme
 this_year = dt.date.today().year
@@ -168,7 +169,7 @@ line_layout = go.Layout(
     xaxis=dict(
         dtick="M1",
         tickformat="%b",
-        range=[f"{this_year}-01-01", f"{this_year}-12-31"],
+        range=[f"{BASE_YEAR}-01-01", "f{BASE_YEAR}-12-31"],
         title={"text": ""},
     ),
     plot_bgcolor="#f8f8f8",
@@ -372,8 +373,8 @@ def get_db_update_time(use_db: bool = False) -> dt.datetime:
         cursor = cnx.cursor()
         cursor.execute(
             "SELECT update_time FROM information_schema.tables "
-            f"WHERE TABLE_SCHEMA = 'cold_ash_moths' "
-            f"AND table_name = 'moth_records';"
+            "WHERE TABLE_SCHEMA = 'cold_ash_moths' "
+            "AND table_name = 'moth_records';"
         )
         (update_time,) = cursor.fetchone()
         moth_logger.debug(update_time)
@@ -467,7 +468,7 @@ def generate_monthly_species(cursor=None):
         get_summary() """
     this_year = dt.date.today().year
 
-    moth_logger.debug(f"Creating by monthly chart")
+    moth_logger.debug("Creating by monthly chart")
     pre_species_df = get_table(
         """
         SELECT tw.Year, tw.Month, tw.MothName
@@ -499,15 +500,16 @@ def generate_monthly_species(cursor=None):
     # Create chart
     fig = go.Figure()
     fig.add_trace(go.Bar(x=x_labels, y=by_all_df, marker_color="#909090", name="All"))
-    fig.add_trace(
-        go.Bar(
-            x=x_labels,
-            y=by_month_df[this_year],
-            width=0.5,
-            marker_color="blue",
-            name=this_year,
+    if this_year in by_month_df.columns:
+        fig.add_trace(
+            go.Bar(
+                x=x_labels,
+                y=by_month_df[this_year],
+                width=0.5,
+                marker_color="blue",
+                name=this_year,
+            )
         )
-    )
     fig.update_layout(barmode="overlay")
     fig.layout.legend.x = 0.99
     fig.layout.legend.y = 0.98
@@ -531,9 +533,7 @@ def generate_cummulative_species_graph(cursor=None):
     )
 
     cum_species["Catch"] = 1
-    cum_species["Date"] = cum_species["Date"].map(
-        lambda dd: dd.replace(year=today.year)
-    )
+    cum_species["Date"] = cum_species["Date"].map(lambda dd: dd.replace(year=BASE_YEAR))
     cum_species.set_index(["Year", "Date", "MothName"], inplace=True)
 
     if cum_species.empty:
@@ -565,10 +565,11 @@ def generate_cummulative_species_graph(cursor=None):
             raise
 
     # Mask future dates to avoid plotting a horizontal line to eoy
-    cum_results.loc[today.year].mask(
-        cum_results.columns > str(today), other=np.NaN, inplace=True
-    )
-
+    if today.year in cum_results.index:
+        cum_results.loc[today.year].mask(
+            cum_results.columns > str(today), other=np.NaN, inplace=True
+        )
+    print(cum_results)
     # Generate cumulative species graph
     # Create chart
     fig = cum_results.transpose().plot()
@@ -598,9 +599,12 @@ def graph_mothname_v3(mothname):
     today_dt = dt.datetime.now()
     nyd = today.replace(month=1, day=1)
     nye = today.replace(month=12, day=31)
-    yyyy = today.year
 
-    date_year_index = pd.DatetimeIndex(pd.date_range(start=nyd, end=nye))
+    date_year_index = pd.DatetimeIndex(
+        pd.date_range(
+            start=nyd.replace(year=BASE_YEAR), end=nye.replace(year=BASE_YEAR)
+        )
+    )
 
     this_year_df = (
         catches_df[catches_df["Date"] >= nyd]
@@ -608,9 +612,10 @@ def graph_mothname_v3(mothname):
         .reindex(date_year_index, fill_value=0)
         .reset_index()
     )
+    print(this_year_df.head(15))
     this_year_df[this_year_df["index"] > today_dt] = None
 
-    catches_df["Date"] = catches_df["Date"].map(lambda e: e.replace(year=yyyy))
+    catches_df["Date"] = catches_df["Date"].map(lambda e: e.replace(year=BASE_YEAR))
     flattened_df = catches_df.groupby("Date").mean()
     all_catches_df = flattened_df.reindex(date_year_index, fill_value=0).reset_index()
 
@@ -626,16 +631,19 @@ def graph_mothname_v3(mothname):
     )
     fig.add_trace(
         go.Scatter(
-            x=this_year_df["index"], y=this_year_df.MothCount, mode="lines", name="2020"
+            x=this_year_df["index"],
+            y=this_year_df.MothCount,
+            mode="lines",
+            name=f"{today.year}",
         )
     )
     fig.add_shape(
         # Line Vertical
         dict(
             type="line",
-            x0=today,
+            x0=today.replace(year=BASE_YEAR),
             y0=0,
-            x1=today,
+            x1=today.replace(year=BASE_YEAR),
             y1=1,
             yref="paper",
             line=dict(color="Black", width=3, dash="dot"),
@@ -680,11 +688,9 @@ def get_used_names(map_tvk2mn, tvk):
     elif isinstance(tvk_entries, pd.DataFrame):
         # Multiple names used, so filter our scientific
         common_name = ", ".join(
-            [
-                n.MothName
-                for n in tvk_entries.itertuples()
-                if n.MothName != n.MothGenus + " " + n.MothSpecies
-            ]
+            n.MothName
+            for n in tvk_entries.itertuples()
+            if n.MothName != n.MothGenus + " " + n.MothSpecies
         )
         scientific_name = t.iloc[0].MothGenus + " " + t.iloc[0].MothSpecies
     else:
@@ -774,17 +780,18 @@ def get_genus(genus=None):
     this_year = today.year
     date_year_index = pd.DatetimeIndex(
         pd.date_range(
-            start=today.replace(month=1, day=1), end=today.replace(month=12, day=31)
+            start=today.replace(year=BASE_YEAR, month=1, day=1),
+            end=today.replace(year=BASE_YEAR, month=12, day=31),
         )
     )
 
     # Need to average by date
     catches_df["Year"] = catches_df.Date.apply(lambda d: d.timetuple().tm_year)
-    catches_df["Date"] = catches_df.Date.apply(lambda d: d.replace(year=this_year))
+    catches_df["Date"] = catches_df.Date.apply(lambda d: d.replace(year=BASE_YEAR))
 
     legend = ["Mean"]
     if this_year in catches_df.Year:
-        legend += [str(this_year)]
+        legend += [f"{this_year}"]
 
     table_df = (
         catches_df.drop(["MothName", "MothGenus"], "columns")
@@ -800,9 +807,9 @@ def get_genus(genus=None):
         # Line Vertical
         dict(
             type="line",
-            x0=today,
+            x0=today.replace(year=BASE_YEAR),
             y0=0,
-            x1=today,
+            x1=today.replace(year=BASE_YEAR),
             y1=1,
             yref="paper",
             line=dict(color="Black", width=3, dash="dot"),
@@ -812,7 +819,7 @@ def get_genus(genus=None):
         ticklabelmode="period",
         dtick="M1",
         tickformat="%b",
-        range=[f"{this_year}-01-01", f"{this_year}-12-31"],
+        range=[f"{BASE_YEAR}-01-01", f"{BASE_YEAR}-12-31"],
     )
     fig.layout.title = genus
     fig.update_layout(line_layout)
@@ -850,17 +857,18 @@ def get_family(family=None):
     this_year = today.year
     date_year_index = pd.DatetimeIndex(
         pd.date_range(
-            start=today.replace(month=1, day=1), end=today.replace(month=12, day=31)
+            start=today.replace(year=BASE_YEAR, month=1, day=1),
+            end=today.replace(year=BASE_YEAR, month=12, day=31),
         )
     )
 
     # Need to average by date
     catches_df["Year"] = catches_df.Date.apply(lambda d: d.timetuple().tm_year)
-    catches_df["Date"] = catches_df.Date.apply(lambda d: d.replace(year=this_year))
+    catches_df["Date"] = catches_df.Date.apply(lambda d: d.replace(year=BASE_YEAR))
 
     legend = ["Mean"]
     if this_year in catches_df.Year:
-        legend += [str(this_year)]
+        legend += [f"{this_year}"]
 
     table_df = (
         catches_df.drop(["MothName", "MothFamily"], "columns")
@@ -876,9 +884,9 @@ def get_family(family=None):
         # Line Vertical
         dict(
             type="line",
-            x0=today,
+            x0=today.replace(year=BASE_YEAR),
             y0=0,
-            x1=today,
+            x1=today.replace(year=BASE_YEAR),
             y1=1,
             yref="paper",
             line=dict(color="Black", width=3, dash="dot"),
@@ -888,7 +896,7 @@ def get_family(family=None):
         ticklabelmode="period",
         dtick="M1",
         tickformat="%b",
-        range=[f"{this_year}-01-01", f"{this_year}-12-31"],
+        range=[f"{BASE_YEAR}-01-01", f"{BASE_YEAR}-12-31"],
     )
     fig.layout.title = family
     fig.update_layout(line_layout)
@@ -1122,10 +1130,7 @@ def get_pspecies(species):
     else:
         # There are multiple species - so provide the choice
         return " ".join(
-            [
-                f'<a href="/species/{specie}">{specie}</a></p>'
-                for specie in unique_species
-            ]
+            f'<a href="/species/{specie}">{specie}</a></p>' for specie in unique_species
         )
 
 
