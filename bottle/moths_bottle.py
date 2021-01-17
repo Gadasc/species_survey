@@ -27,6 +27,7 @@ data of bio-survey.
   * Food plant correlation and prediction
 
 ### History
+    17 Jan 2021 - Fixed graph x-axis to use a leap year 2000 as base
     29 Sep 2020 - Implementing a cache on the graphs
     27 Sep 2020 - Finshed adding plotly summary is no 24s.
     14 Sep 2020 - Started adding plotly for summary (initially 35s, subsequenc 4s)
@@ -214,7 +215,6 @@ def get_table(sql_query, multi=False):
     """ Creates a pandas DataFrame from a SQL Query"""
 
     # Establish a connection to the SQL server
-    # print(sql_config)
     start = time.time()
     cnx = mariadb.connect(**sql_config)
     cursor = cnx.cursor()
@@ -569,7 +569,6 @@ def generate_cummulative_species_graph(cursor=None):
         cum_results.loc[today.year].mask(
             cum_results.columns > str(today), other=np.NaN, inplace=True
         )
-    print(cum_results)
     # Generate cumulative species graph
     # Create chart
     fig = cum_results.transpose().plot()
@@ -865,7 +864,6 @@ def get_family(family=None):
     catches_df["Date"] = catches_df.Date.apply(lambda d: d.replace(year=BASE_YEAR))
 
     legend = ["Mean"]
-    print(catches_df.Year)
     if this_year in catches_df.Year.unique():
         legend += [this_year]
 
@@ -988,8 +986,7 @@ def serve_survey2(dash_date_str=None):
     recorder_list = get_table("SELECT * from recorders_list;")["Recorder"].to_list()
     trap_list = get_table("SELECT * from traps_list;")["Trap"].to_list()
     location_list = get_table("SELECT Name from locations_list;")["Name"].to_list()
-    print("LOCATION LIST")
-    print(location_list)
+
     return template(
         "vue_survey.tpl",
         records=json.dumps(unmangled_records),
@@ -1085,7 +1082,7 @@ def species():
 def get_pspecies(species):
     """ Generate a summary page for the specified moth species.
         Use % as a wildcard."""
-    print(f"Displaying: {species}")
+
     species = species.replace("%20", " ")
     query_str = f"""SELECT mr.Date, re.MothName, mr.MothCount, re.TVK
         FROM (select * from {cfg['TAXONOMY_TABLE']} where MothName = "{species}") sp
@@ -1150,7 +1147,6 @@ def show_latest():
     )
 
     earliest_table_date = min(recent_df.Date)
-    print("EARLIEST:", earliest_table_date)
 
     seen_before = get_table(
         f"""SELECT MothName, YEAR(Max(Date)) Year, TVK FROM
@@ -1191,12 +1187,6 @@ def show_latest():
 @app.post("/handle_survey")
 def survey_handler():
     """ Handler to manage the data returned from the survey sheet. """
-    print("SUBMIT VALUES FROM SURVEY")
-    for k, v in request.forms.items():
-        try:
-            print(k, json.loads(v))
-        except json.decoder.JSONDecodeError:
-            print(k, v)
 
     date_string = request.forms["dash_date_str"]
     default_recorder = request.forms.get("option_Recorder") or "NULL"
@@ -1363,7 +1353,6 @@ def config_add_option():
     """
 
     option_data = json.loads(request.forms["option_data"])
-    print("OPTION DATA:", option_data)
     # A map of column name from moth_records table to its options table
     options_map = {
         "Location": "locations_list",
@@ -1380,13 +1369,11 @@ def config_add_option():
     except KeyError:
         option_default = "NULL"
 
-    print("CONFIG", option_name, ": ", option_default, " (default)")
     # Empty table
     get_table(f"TRUNCATE {options_map[option_name]}")
 
     # Refill table
     for opt_details in option_options:
-        print(opt_details)
         quote_list = [f'"{v}"' for v in opt_details.values()]
         get_table(
             f"INSERT INTO {options_map[option_name]} VALUES ({', '.join(quote_list)});"
