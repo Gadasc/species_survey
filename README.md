@@ -10,7 +10,7 @@ Very little effort has been spent on making the install process smooth.
 Having said that I do believe there are only a few steps needed:
 
 1. clone the repo to your local machine
-2. Install/config a mysql or mariadb server - I use mariadb, so that is recommended
+2. Install/config a mysql or mariadb server - I use mariadb, so that is recommended. If you would rather use a sqlite3 filebased (and get the app to set this up for you, let me know)
 3. create a file sql_config_local.py to override the values in sql_config.py
 4. Ensure you have installed the dependancies 
 5. run moth_bottle.py (I run this from a crontab at boot)
