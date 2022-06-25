@@ -13,6 +13,7 @@ Having said that I do believe there are only a few steps needed:
 2. Install/config a mysql or mariadb server - I use mariadb, so that is recommended. If you would rather use a sqlite3 filebased (and get the app to set this up for you, let me know)
 3. create a file sql_config_local.py to override the values in sql_config.py
 4. Ensure you have installed the dependancies 
+```pip install markdown numpy bottle pandas mysql.connector```
 5. run moth_bottle.py (I run this from a crontab at boot)
 6. point a brower at <your machine>:8082
 
