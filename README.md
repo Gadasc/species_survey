@@ -36,4 +36,9 @@ The specific instructions needed to define the user details in sql_config_defaul
   
 If you want to change the database name, username or password - just make sure you create a sql_config_local.py that overrides the default values to set them to the values you use here.
   
-  
+## Populating the database
+Remember that disclaimer? Well here's the first hack.
+
+  1. Rename/copy the file 20200810_irecord_names.csv to 20200429_moth_names_all.csv.
+  `cp 20200810_irecord_names.csv 20200429_moth_names_all.csv `
+  2. run the script  `python create_tables.py`
