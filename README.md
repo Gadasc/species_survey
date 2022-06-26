@@ -10,13 +10,15 @@ Very little effort has been spent on making the install process smooth.
 Having said that I do believe there are only a few steps needed:
 
 1. clone the repo to your local machine
-2. Install/config a mysql or mariadb server - I use mariadb, so that is recommended. If you would rather use a sqlite3 filebased (and get the app to set this up for you, let me know)
+2. Install/config a mysql or mariadb server - I use mariadb, so that is recommended. (See notes below about installation). If you would rather use a sqlite3 filebased (and get the app to set this up for you, let me know)
 3. create a file sql_config_local.py to override the values in sql_config.py
 4. Ensure you have installed the dependancies 
 ```pip install markdown numpy bottle pandas mysql.connector waitress```
 5. run moth_bottle.py (I run this from a crontab at boot)
 6. point a brower at <your machine>:8082
 
+HOLD FIRE: I'm working through a fresh install with the latest external dependancies. I've found one bug that was benign with my old version of pandas but throws and exception witht he latest. And I need to add instrucitons on installing vue.js  
+  
 Good luck and let me know how it goes.
   
   
@@ -42,5 +44,7 @@ Remember that disclaimer? Well here's the first hack.
   1. Rename/copy the file 20200810_irecord_names.csv to 20200429_moth_names_all.csv.
   `cp 20200810_irecord_names.csv 20200429_moth_names_all.csv `
   2. run the script  `python create_tables.py`
-  3. _HACK 2_ Copy `app_config_default.py` to `app_config_local.py` and update the TAXONOMY_TABLE entry: `app_config["TAXONOMY_TABLE"] = "moth_taxonomy"`
-`
+  3. _HACK 2_ login again to mysql: `sudo mysql -uroot -p`
+  4. Add the column TVK: `ALTER TABLE moth_taxonomy ADD COLUMN TVK varchar(50);`
+  5. Rename the table: `RENAME TABLE moth_taxonomy TO irecord_taxonomy;`
+  
