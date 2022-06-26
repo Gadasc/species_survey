@@ -42,3 +42,5 @@ Remember that disclaimer? Well here's the first hack.
   1. Rename/copy the file 20200810_irecord_names.csv to 20200429_moth_names_all.csv.
   `cp 20200810_irecord_names.csv 20200429_moth_names_all.csv `
   2. run the script  `python create_tables.py`
+  3. _HACK 2_ Copy `app_config_default.py` to `app_config_local.py` and update the TAXONOMY_TABLE entry: `app_config["TAXONOMY_TABLE"] = "moth_taxonomy"`
+`
