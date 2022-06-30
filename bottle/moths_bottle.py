@@ -27,7 +27,8 @@ data of bio-survey.
   * Food plant correlation and prediction
 
 ### History
-    30 Jun 2022 - Fixed a bug exposed by latest pandas module.
+    30 Jun 2022 - Fixed a bug exposed by latest pandas
+    31 Jan 2021 - Pulled 'Site name' out of comment into its own column for export
     17 Jan 2021 - Fixed graph x-axis to use a leap year 2000 as base
     29 Sep 2020 - Implementing a cache on the graphs
     27 Sep 2020 - Finshed adding plotly summary is no 24s.
@@ -339,7 +340,6 @@ def generate_records_file(cursor, date_dash_str):
             Location location, Recorder recorder, Trap trap FROM moth_records
             WHERE Date='{date_dash_str}' AND MothName != 'NULL';"""
     )
-    print(records_df)
     records_df["species"] = records_df.species.apply(lambda s: s.replace(" ", "_"))
     records_df.set_index("species", inplace=True)
     records_dict = records_df.to_dict(orient="index")
@@ -1271,15 +1271,15 @@ def export_data(dl_year, dl_month=None):
     month_option = f" AND Month(Date)={dl_month}" if dl_month else ""
     query_string = f"""SELECT mr.Date, CONCAT(mt.MothGenus, " ", mt.MothSpecies) Species,
         mr.MothCount Quantity, ll.OSGB_Grid GridRef, mr.Recorder "Recorder Name",
-        CONCAT("Lamp Trap: ", mr.Trap, "\nCommon Name: ", mt.MothName,
-            "\nLocation Name: ", mr.Location) Comment
+        mr.Location "Site name",
+        CONCAT("Lamp Trap: ", mr.Trap, "\nCommon Name: ", mt.MothName) Comment
         FROM (select * FROM moth_records WHERE Year(Date)={dl_year} {month_option}) mr
         JOIN (SELECT * FROM {cfg["TAXONOMY_TABLE"]}) mt ON mr.MothName=mt.MothName
         JOIN (SELECT * FROM locations_list) ll ON ll.Name=mr.Location;"""
 
     moth_logger.debug(query_string)
     export_data = get_table(query_string)
-
+    export_data["Stage"] = "Adult"  # Currently we only survey by adults
     return template(export_data.loc[export_data["Quantity"] != 0].to_csv(index=False))
 
 
