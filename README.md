@@ -15,6 +15,7 @@ Having said that I do believe there are only a few steps needed:
 4. Ensure you have installed the dependancies 
 ```pip install markdown numpy bottle pandas mysql.connector waitress```
 5. Install Vue.js version 2 into the ./bottle/static directory: `wget https://raw.githubusercontent.com/vuejs/vue/2.6/dist/vue.js` 
+5. Populate the tables by running `python ./bottle/create_tables.py` 
 5. run moth_bottle.py (I run this from a crontab at boot)
 6. point a brower at <your machine>:8082
 
@@ -36,14 +37,4 @@ The specific instructions needed to define the user details in sql_config_defaul
   5. Finally: `FLUSH PRIVILEGES;`
   
 If you want to change the database name, username or password - just make sure you create a sql_config_local.py that overrides the default values to set them to the values you use here.
-  
-## Populating the database
-Remember that disclaimer? Well here's the first hack.
-
-  1. Rename/copy the file 20200810_irecord_names.csv to 20200429_moth_names_all.csv.
-  `cp 20200810_irecord_names.csv 20200429_moth_names_all.csv `
-  2. run the script  `python create_tables.py`
-  3. _HACK 2_ login again to mysql: `sudo mysql -uroot -p`
-  4. Add the column TVK: `ALTER TABLE moth_taxonomy ADD COLUMN TVK varchar(50);`
-  5. Rename the table: `RENAME TABLE moth_taxonomy TO irecord_taxonomy;`
   
