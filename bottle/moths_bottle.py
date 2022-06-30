@@ -27,6 +27,7 @@ data of bio-survey.
   * Food plant correlation and prediction
 
 ### History
+    30 Jun 2022 - Fixed a bug exposed by latest pandas
     31 Jan 2021 - Pulled 'Site name' out of comment into its own column for export
     17 Jan 2021 - Fixed graph x-axis to use a leap year 2000 as base
     29 Sep 2020 - Implementing a cache on the graphs
@@ -339,7 +340,7 @@ def generate_records_file(cursor, date_dash_str):
             Location location, Recorder recorder, Trap trap FROM moth_records
             WHERE Date='{date_dash_str}' AND MothName != 'NULL';"""
     )
-    records_df["species"] = records_df.apply(lambda s: s.replace(" ", "_"))
+    records_df["species"] = records_df.species.apply(lambda s: s.replace(" ", "_"))
     records_df.set_index("species", inplace=True)
     records_dict = records_df.to_dict(orient="index")
 
