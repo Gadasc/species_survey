@@ -19,7 +19,6 @@ Having said that I do believe there are only a few steps needed:
 6. point a brower at <your machine>:8082
 
 HOLD FIRE: I'm working through a fresh install with the latest external dependancies. I've found one bug that was benign with my old version of pandas but throws and exception witht he latest. 
-
 Good luck and let me know how it goes.
   
   
