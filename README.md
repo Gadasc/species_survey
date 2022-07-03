@@ -14,6 +14,7 @@ Having said that I do believe there are only a few steps needed:
 3. create a file sql_config_local.py to override the values in sql_config.py
 4. Ensure you have installed the dependancies 
 ```pip install markdown numpy bottle pandas mysql.connector waitress```
+5. Install libcblas.lib used by pandas - `sudo apt-get install libatlas-base-dev`
 5. Populate the tables by running `python ./bottle/create_tables.py` 
 6. run moth_bottle.py (I run this from a crontab at boot)
 7. point a browser at `http://<your machine>:8082`
