@@ -14,10 +14,9 @@ Having said that I do believe there are only a few steps needed:
 3. create a file sql_config_local.py to override the values in sql_config.py
 4. Ensure you have installed the dependancies 
 ```pip install markdown numpy bottle pandas mysql.connector waitress```
-5. Install Vue.js version 2 into the ./bottle/static directory: `wget https://raw.githubusercontent.com/vuejs/vue/2.6/dist/vue.js` 
 5. Populate the tables by running `python ./bottle/create_tables.py` 
-5. run moth_bottle.py (I run this from a crontab at boot)
-6. point a brower at <your machine>:8082
+6. run moth_bottle.py (I run this from a crontab at boot)
+7. point a brower at <your machine>:8082
 
 Good luck and let me know how it goes.
   
