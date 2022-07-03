@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <script src="/static/vue.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.7.0"></script>
     <script src="/static/manifest.js"></script>
     <script src="/static/common_names.js?"></script>
     <link rel="stylesheet" type="text/css" href="/static/vue_survey.css">
