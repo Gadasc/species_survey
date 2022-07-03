@@ -3,8 +3,8 @@
 <html>
 <head>
 <meta http-equiv="cache-control" content="no-cache" />
-<title>Merrington House Moth Survey</title>
-<script src="/static/vue.js"></script>
+<title>Moth Survey</title>
+<script src="https://cdn.jsdelivr.net/npm/vue@2.7.0"></script>
 <link rel="stylesheet" type="text/css" href="/static/mothmenu.css">
 <link rel="stylesheet" type="text/css" href="/static/latest.css">
 </head>

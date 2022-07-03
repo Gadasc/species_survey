@@ -3,7 +3,7 @@
 <html>
 <head>
 <meta http-equiv="cache-control" content="no-cache" />
-<title>Merrington House Moth Survey</title>
+<title>Moth Survey</title>
 <link rel="stylesheet" type="text/css" href="/static/mothmenu.css">
 <link rel="stylesheet" type="text/css" href="/static/mothgrid.css">
 <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>

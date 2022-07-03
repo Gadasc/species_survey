@@ -1,8 +1,8 @@
 <head>
 <meta http-equiv="cache-control" content="no-cache" />
-<title>Merrington House Moth Survey</title>
+<title>Moth Survey</title>
 <link rel="stylesheet" type="text/css" href="/static/mothmenu.css">
-<script src="/static/vue.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/vue@2.7.0"></script>
 
 </head>
 

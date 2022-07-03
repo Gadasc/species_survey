@@ -2,9 +2,9 @@
 
 <html>
 <head>
-<title>Merrington House Moth Survey</title>
+<title>Moth Survey</title>
 <meta http-equiv="cache-control" content="no-cache" />
-<script src="/static/vue.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/vue@2.7.0"></script>
 <link rel="stylesheet" type="text/css" href="/static/mothmenu.css">
 <link rel="stylesheet" type="text/css" href="/static/latest.css">
 </head>
