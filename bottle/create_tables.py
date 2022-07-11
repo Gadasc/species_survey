@@ -1,3 +1,6 @@
+import copy
+import getpass
+import glob
 import mysql.connector
 import pandas as pd
 
@@ -5,11 +8,37 @@ try:
     from sql_config_local import sql_config
 except ModuleNotFoundError:
     from sql_config_default import sql_config
-moth_names = "./20200810_irecord_names.csv"
+
+# find latest file to create taxonomy tables
+moth_names = max(glob.glob("????????_irecord_names.csv"))
+print("Using input file:", moth_names)
+
+# Generate root login
+root_config = copy.deepcopy(sql_config)
+del root_config["database"]
+root_config["user"] = "root"
+root_config["password"] = getpass.getpass(prompt="Database root password:")
+
+cnx = mysql.connector.connect(**root_config)
+del root_config["password"]
+cursor = cnx.cursor()
+
+# Create database (if it doesn't exist)
+cursor.execute(f"CREATE DATABASE IF NOT EXISTS {sql_config['database']};")
+cursor.execute(
+    f"""CREATE USER IF NOT EXISTS '{sql_config["user"]}'@'localhost' 
+    IDENTIFIED BY '{sql_config["password"]}';"""
+)
+cursor.execute(
+    f"""GRANT ALL PRIVILEGES ON {sql_config['database']}.* 
+    TO '{sql_config["user"]}'@'localhost';"""
+)
+cursor.execute("FLUSH PRIVILEGES;")
+cursor.close()
+cnx.close()
 
 cnx = mysql.connector.connect(**sql_config)
 cursor = cnx.cursor()
-
 
 # Create records table
 try:
