@@ -15,7 +15,7 @@ Having said that I do believe there are only a few steps needed:
 4. Ensure you have installed the dependancies 
 ```pip install markdown numpy bottle pandas mysql.connector waitress```
 5. Install libcblas.lib used by pandas - `sudo apt-get install libatlas-base-dev`
-5. Populate the tables by running `python ./bottle/create_tables.py` 
+5. Populate the tables by running `python ./bottle/create_tables.py`. This will ask for the `root` password, which is not stored.
 6. run moth_bottle.py (I run this from a crontab at boot)
 7. point a browser at `http://<your machine>:8082`
 
@@ -27,14 +27,4 @@ Good luck and let me know how it goes.
 There is a good tutorial here: https://raspberrytips.com/install-mariadb-raspberry-pi/
   
 Follow this tutorial to set up root access from the local machine
-
-The specific instructions needed to define the user details in sql_config_default.py are:
-
-  1. Login as root: `sudo mysql -uroot -p`
-  2. Create database: `CREATE DATABASE moths_database;`
-  3. Create user: `CREATE USER `'moths'@'localhost' IDENTIFIED BY 'moths12345';`
-  4. Grant privileges: `GRANT ALL PRIVILEGES ON moths_database.* TO 'moths'@'localhost';`
-  5. Finally: `FLUSH PRIVILEGES;`
-  
-If you want to change the database name, username or password - just make sure you create a sql_config_local.py that overrides the default values to set them to the values you use here.
   
