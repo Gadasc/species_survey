@@ -27,6 +27,7 @@ data of bio-survey.
   * Food plant correlation and prediction
 
 ### History
+    24 Jul 2022 - Add support for sqlite3
     30 Jun 2022 - Fixed a bug exposed by latest pandas
     31 Jan 2021 - Pulled 'Site name' out of comment into its own column for export
     17 Jan 2021 - Fixed graph x-axis to use a leap year 2000 as base
@@ -125,6 +126,7 @@ import logging
 import logging.handlers
 from functools import wraps, lru_cache
 from markdown import markdown
+import sqlite3
 
 import numpy as np
 from bottle import Bottle, template, static_file, TEMPLATE_PATH, request, response, run
@@ -215,21 +217,41 @@ sql_logger.addHandler(sql_file_handler)
 
 def get_table(sql_query, multi=False):
     """ Creates a pandas DataFrame from a SQL Query"""
+    return update_moth_taxonomy.get_table(sql_query)
 
-    # Establish a connection to the SQL server
-    start = time.time()
-    cnx = mariadb.connect(**sql_config)
-    cursor = cnx.cursor()
-
-    cursor.execute(sql_query, multi=multi)
-    data_list = [list(c) for c in cursor]
-    count_df = pd.DataFrame(data_list, columns=list(cursor.column_names))
-
-    cursor.close()
-    cnx.close()
-    one_line_query = re.sub("[\n\\s]+", " ", sql_query)
-    sql_logger.debug(f"{time.time()-start}\t{len(count_df)}\t{one_line_query}")
-    return count_df
+#    # Establish a connection to the SQL server
+#    start = time.time()
+##    cnx = mariadb.connect(**sql_config)
+#    cnx = update_moth_taxonomy.get_db_connection()
+#    cursor = cnx.cursor()
+#
+#    if cfg["USE_SQLITE"]:
+#        cursor.execute(sql_query)
+#        print("===", cursor.description)
+#        table = cfg["TAXONOMY_TABLE"]
+#        columns = [
+#            n[0] 
+#            for n in cursor.execute(f'SELECT name FROM PRAGMA_TABLE_INFO("{sql_query}");')
+#            ]
+#        print(">>>", columns)
+# #       columns = [
+# #           n[0] 
+# #           for n in cursor.execute(f'SELECT name FROM PRAGMA_TABLE_INFO("irecord_taxonomy");')
+# #           ]
+# #       print(columns)
+#
+#    else:
+#        cursor.execute(sql_query, multi=multi)
+#        columns =list(cursor.column_names)
+# 
+#    data_list = [list(c) for c in cursor]
+#    count_df = pd.DataFrame(data_list, columns=columns)
+#
+#    cursor.close()
+#    cnx.close()
+#    one_line_query = re.sub("[\n\\s]+", " ", sql_query)
+#    sql_logger.debug(f"{time.time()-start}\t{len(count_df)}\t{one_line_query}")
+#    return count_df
 
 
 def log_to_logger(fn):
@@ -260,14 +282,22 @@ def refresh_manifest(dash_date_str):
     """ The manifest.js file is a list of the most likely moths to be caught
         along with the number of recently caught speciments."""
 
-    # reject singletons in most recent two catches.
-    manifest = (
-        get_table(
-            f"""SELECT MothName species, Date, SUM(MothCount) recent
+    if cfg["USE_SQLITE"]:
+        sql_query = f"""SELECT MothName species, Date, SUM(MothCount) recent
+            FROM moth_records WHERE
+            MothName != "None" AND
+            Date > DATE("{dash_date_str}", "-7 DAYS") AND
+            Date <= DATE("{dash_date_str}") GROUP BY Date, species;"""
+    else:
+        sql_query = f"""SELECT MothName species, Date, SUM(MothCount) recent
             FROM moth_records WHERE
             MothName != "None" AND
             Date > DATE_ADD(DATE("{dash_date_str}"), INTERVAL -7 DAY) AND
             Date <= DATE("{dash_date_str}") GROUP BY Date, species;"""
+
+    # reject singletons in most recent two catches.
+    manifest = (
+        get_table(sql_query
         )
         .set_index(["species", "Date"])
         .unstack("Date")
@@ -336,10 +366,11 @@ def generate_records_file(cursor, date_dash_str):
     """
     #   columns = []
     records_df = get_table(
-        f"""SELECT MothName species, MothCount count,
-            Location location, Recorder recorder, Trap trap FROM moth_records
+        f"""SELECT MothName AS species, MothCount AS count,
+            Location AS location, Recorder AS recorder, Trap AS trap FROM moth_records
             WHERE Date='{date_dash_str}' AND MothName != 'NULL';"""
     )
+    print(records_df)
     records_df["species"] = records_df.species.apply(lambda s: s.replace(" ", "_"))
     records_df.set_index("species", inplace=True)
     records_dict = records_df.to_dict(orient="index")
@@ -371,7 +402,8 @@ def get_db_update_time(use_db: bool = False) -> dt.datetime:
 
     if use_db:
         moth_logger.debug("Checking db for last update")
-        cnx = mariadb.connect(**sql_config)
+#        cnx = mariadb.connect(**sql_config)
+        cnx = update_moth_taxonomy.get_db_connection()
         cursor = cnx.cursor()
         cursor.execute(
             "SELECT update_time FROM information_schema.tables "
@@ -1229,7 +1261,8 @@ def survey_handler():
         fout_js.write(json.dumps(results_dict))
 
     # Get a connection to the databe
-    cnx = mariadb.connect(**sql_config)
+#    cnx = mariadb.connect(**sql_config)
+    cnx = update_moth_taxonomy.get_db_connection()
     cursor = cnx.cursor()
     update_moth_database(cursor, date_string, results_dict)
     cnx.close()

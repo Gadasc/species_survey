@@ -19,7 +19,9 @@ app_config["LOG_FILE"] = "moth_bottle.log"
 app_config["REQUESTS_LOG_FILE"] = "requests.log"
 app_config["TAXONOMY_TABLE"] = "irecord_taxonomy"
 app_config["DB_UPDATE_TIME_FILE"] = "db_update_time.flag"
-
+app_config["USE_SQLITE"] = True
+app_config["SQLITE_FILE"] = "records.db"
+app_config["SQLITE_PATH"] = "./sqlite/"
 
 # Test paths exist and create them if missing
 try:

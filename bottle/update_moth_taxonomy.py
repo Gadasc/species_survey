@@ -9,17 +9,22 @@ will be (re)written.
 
 History
 -------
+14 July 2022 - Added support for sqlite3
 14 July 2020 - Added code to add the recorder, location and trap tables
 26 June 2020 - Added indexes
 20 June 2020 - Made sure list going into common_names.js is sorted.
    June 2020 - Genesis
 
 """
-import pandas as pd
-import mysql.connector as mariadb
-import os
+
 import datetime as dt
 import glob
+import logging
+import mysql.connector as mariadb
+import os
+import pandas as pd
+import sqlite3
+import warnings
 
 # Can't call this twice without messing things up.
 # TODO: get rid of the global variables and
@@ -90,8 +95,17 @@ def update_check():
     return newest_table_name
 
 
+def get_db_connection():
+    if cfg["USE_SQLITE"]:
+        cnx = sqlite3.connect(cfg["SQLITE_PATH"] + cfg["SQLITE_FILE"])
+    else:
+        cnx = mariadb.connect(**sql_config)
+    return cnx
+
+
 def update_table(tablename, filename):
-    cnx = mariadb.connect(**sql_config)
+#    cnx = mariadb.connect(**sql_config)
+    cnx = get_db_connection()
     cursor = cnx.cursor()
     rv = True
 
@@ -148,12 +162,31 @@ def get_table(sql_query):
 
     # Establish a connection to the SQL server
     # print(sql_config)
-    cnx = mariadb.connect(**sql_config)
+    #cnx = mariadb.connect(**sql_config)
+    cnx = get_db_connection()
     cursor = cnx.cursor()
 
-    cursor.execute(sql_query)
+    try:
+        cursor.execute(sql_query)
+    except:
+        logging.error(f"{sql_query} raised an SQL issue!")
+        raise
+
     data_list = [list(c) for c in cursor]
-    count_df = pd.DataFrame(data_list, columns=list(cursor.column_names))
+
+    if cfg["USE_SQLITE"]:
+        try: 
+            columns = [c[0] for c in cursor.description]
+        except TypeError:
+            columns = None
+            logging.warn(f"{sql_query} does not generate a table!")
+        except sql.OperationalError:
+            logging.error(f"{sql_query} raised an SQL issue!")
+            raise
+    else:
+        columns = list(cursor.column_names)
+
+    count_df = pd.DataFrame(data_list, columns=columns)
 
     cursor.close()
     cnx.close()
@@ -171,7 +204,8 @@ def update_records(mapfile_name):
     # Get list of names in records
     unique_names = get_table("SELECT MothName FROM moth_records GROUP BY MothName;")
 
-    cnx = mariadb.connect(**sql_config)
+#    cnx = mariadb.connect(**sql_config)
+    cnx = get_db_connection()
     cursor = cnx.cursor()
 
     for mname in unique_names["MothName"]:
@@ -219,12 +253,20 @@ def set_column_default(col_name, def_value):
 def get_column_default(col_name):
     """ Encapsulates the retrieval of a column default value
     """
-    records_description = get_table("DESCRIBE moth_records;").set_index("Field")
+    if cfg["USE_SQLITE"]:
+        records_description = get_table("PRAGMA table_info(moth_records);").set_index("name")
+        try:
+            rv = records_description.loc[col_name]["dflt_value"]
+        except KeyError:
+            rv = None
+        
+    else:
+        records_description = get_table("DESCRIBE moth_records;").set_index("Field")
+        try:
+            rv = records_description.loc[col_name]["Default"]
+        except KeyError:
+            rv = None
 
-    try:
-        rv = records_description.loc[col_name]["Default"]
-    except KeyError:
-        rv = None
     return rv
 
 
@@ -242,9 +284,25 @@ def update_table_moth_taxonomy():
     # Ensure additional columns exist - don't set default.
     # If no value set, then it will get automatically updated when the first
     # default is set.
-    get_table("ALTER TABLE moth_records ADD COLUMN IF NOT EXISTS" " Recorder CHAR(30);")
-    get_table("ALTER TABLE moth_records ADD COLUMN IF NOT EXISTS" " Trap CHAR(30);")
-    get_table("ALTER TABLE moth_records ADD COLUMN IF NOT EXISTS" " Location CHAR(30);")
+    if not cfg["USE_SQLITE"]:
+        get_table("ALTER TABLE moth_records ADD COLUMN IF NOT EXISTS" " Recorder CHAR(30);")
+        get_table("ALTER TABLE moth_records ADD COLUMN IF NOT EXISTS" " Trap CHAR(30);")
+        get_table("ALTER TABLE moth_records ADD COLUMN IF NOT EXISTS" " Location CHAR(30);")
+    else:
+        # SQLITE doesn't support the IF NOT EXISTS clause on ALTER TABLE
+        try:
+            get_table("ALTER TABLE moth_records ADD COLUMN Recorder CHAR(30);")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            get_table("ALTER TABLE moth_records ADD COLUMN Trap CHAR(30);")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            get_table("ALTER TABLE moth_records ADD COLUMN Location CHAR(30);")
+        except sqlite3.OperationalError:
+            pass
+        warnings.warn("FUTURE PROOFING: Need to add code to handle the addition of new columns")
 
     # Create supplimentaty tables for Recorders, Traps and Locations.
     get_table("CREATE TABLE IF NOT EXISTS recorders_list (Recorder CHAR(30) NOT NULL);")
