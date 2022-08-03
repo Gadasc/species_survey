@@ -329,7 +329,10 @@ def update_moth_database(cursor, sql_date_string, dict_records):
         pass
 
     # delete any records for today
-    cursor.execute("DELETE FROM moth_records WHERE Date = %s;", (sql_date_string,))
+    if cfg["USE_SQLITE"]:
+        cursor.execute("DELETE FROM moth_records WHERE Date = ?;", (sql_date_string,))
+    else:
+        cursor.execute("DELETE FROM moth_records WHERE Date = %s;", (sql_date_string,))
 
     if not dict_records:
         # If no moths recorded, add a null entry to identify we did trap on this date.
@@ -447,15 +450,26 @@ def get_moth_grid():
     current_month = dt.date.today().month
     cols = 5
 
-    sql_species_name_by_month_year = f"""
-        SELECT tw.Year, tw.Month, tw.MothName
-            FROM (
-                SELECT year(Date) Year, month(Date) Month, MothName
-                    FROM moth_records
-                    WHERE MothName IS NOT NULL AND month(Date) = {current_month}
-                    GROUP BY Year, Month, MothName
-            ) tw
-        GROUP BY Year, Month, MothName;"""
+    if cfg["USE_SQLITE"]:
+        sql_species_name_by_month_year = f"""
+            SELECT tw.Year, tw.Month, tw.MothName
+                FROM (
+                    SELECT strftime("%Y", Date) Year, strftime("%m", Date) Month, MothName
+                        FROM moth_records
+                        WHERE MothName IS NOT NULL AND strftime("%m", Date) = {current_month}
+                        GROUP BY Year, Month, MothName
+                ) tw
+            GROUP BY Year, Month, MothName;"""
+    else:
+        sql_species_name_by_month_year = f"""
+            SELECT tw.Year, tw.Month, tw.MothName
+                FROM (
+                    SELECT year(Date) Year, month(Date) Month, MothName
+                        FROM moth_records
+                        WHERE MothName IS NOT NULL AND month(Date) = {current_month}
+                        GROUP BY Year, Month, MothName
+                ) tw
+            GROUP BY Year, Month, MothName;"""
 
     species_df = get_table(sql_species_name_by_month_year)
 
@@ -503,17 +517,30 @@ def generate_monthly_species(cursor=None):
     this_year = dt.date.today().year
 
     moth_logger.debug("Creating by monthly chart")
-    pre_species_df = get_table(
-        """
-        SELECT tw.Year, tw.Month, tw.MothName
-        FROM (
-            SELECT year(Date) Year, month(Date) Month, MothName
-                FROM moth_records
-                WHERE MothName IS NOT NULL
-            GROUP BY Year, Month, MothName
-        ) tw
-        GROUP BY Year, Month, MothName;"""
-    )
+    if cfg["USE_SQLITE"]:
+        pre_species_df = get_table(
+            """
+            SELECT tw.Year, tw.Month, tw.MothName
+            FROM (
+                SELECT strftime("%Y", Date) Year, strftime("%m", Date) Month, MothName
+                    FROM moth_records
+                    WHERE MothName IS NOT NULL
+                GROUP BY Year, Month, MothName
+            ) tw
+            GROUP BY Year, Month, MothName;"""
+        )
+    else:
+        pre_species_df = get_table(
+            """
+            SELECT tw.Year, tw.Month, tw.MothName
+            FROM (
+                SELECT year(Date) Year, month(Date) Month, MothName
+                    FROM moth_records
+                    WHERE MothName IS NOT NULL
+                GROUP BY Year, Month, MothName
+            ) tw
+            GROUP BY Year, Month, MothName;"""
+        )
 
     if pre_species_df.empty:
         pre_species_df = pd.DataFrame(
@@ -561,12 +588,22 @@ def generate_cummulative_species_graph(cursor=None):
     today = dt.date.today()
 
     # Update species graph
-    cum_species = get_table(
-        "SELECT year(Date) Year, Date, MothName "
-        "FROM moth_records WHERE MothName IS NOT NULL;"
-    )
+    if cfg["USE_SQLITE"]:
+        cum_species = get_table(
+            "SELECT strftime('%Y', Date) Year, Date, MothName "
+            "FROM moth_records WHERE MothName IS NOT NULL;"
+        )
+    else:
+        cum_species = get_table(
+            "SELECT year(Date) Year, Date, MothName "
+            "FROM moth_records WHERE MothName IS NOT NULL;"
+        )
 
     cum_species["Catch"] = 1
+    # Ensure dd in lambda is a date object so we can easily replace  the base year
+    # SQLITE dates are only strings.
+    if cfg["USE_SQLITE"]:
+        cum_species["Date"] = cum_species["Date"].map(lambda dd: dt.date.fromisoformat(dd))
     cum_species["Date"] = cum_species["Date"].map(lambda dd: dd.replace(year=BASE_YEAR))
     cum_species.set_index(["Year", "Date", "MothName"], inplace=True)
 
@@ -735,15 +772,26 @@ def get_used_names(map_tvk2mn, tvk):
 def get_genus_list():
     """ Show list of moths caught to date. """
 
-    sql_string = f"""
-    SELECT MothGenus Genus, ceil(avg(Count)) `Annual Average` FROM
-    (
-        SELECT year(Date) Year,  MothGenus,  sum(MothCount) Count
-            FROM moth_records INNER JOIN {cfg["TAXONOMY_TABLE"]}
-                ON moth_records.MothName = {cfg["TAXONOMY_TABLE"]}.MothName
-            GROUP BY Year, MothGenus
-    ) gc
-    GROUP BY Genus ORDER BY `Annual Average` DESC;"""
+    if cfg["USE_SQLITE"]:
+        sql_string = f"""
+        SELECT MothGenus Genus, round(avg(Count+0.49)) `Annual Average` FROM
+        (
+            SELECT strftime("%Y", Date) Year,  MothGenus,  sum(MothCount) Count
+                FROM moth_records INNER JOIN {cfg["TAXONOMY_TABLE"]}
+                    ON moth_records.MothName = {cfg["TAXONOMY_TABLE"]}.MothName
+                GROUP BY Year, MothGenus
+        ) gc
+        GROUP BY Genus ORDER BY `Annual Average` DESC;"""
+    else:
+        sql_string = f"""
+        SELECT MothGenus Genus, ceil(avg(Count)) `Annual Average` FROM
+        (
+            SELECT year(Date) Year,  MothGenus,  sum(MothCount) Count
+                FROM moth_records INNER JOIN {cfg["TAXONOMY_TABLE"]}
+                    ON moth_records.MothName = {cfg["TAXONOMY_TABLE"]}.MothName
+                GROUP BY Year, MothGenus
+        ) gc
+        GROUP BY Genus ORDER BY `Annual Average` DESC;"""
 
     sql_df = get_table(sql_string)
 
@@ -762,15 +810,26 @@ def get_genus_list():
 def get_family_list():
     """ Show list of moths caught to date. """
 
-    sql_string = f"""
-    SELECT MothFamily Family, ceil(avg(Count)) `Annual Average` FROM
-    (
-        SELECT year(Date) Year,  MothFamily,  sum(MothCount) Count
-            FROM moth_records INNER JOIN {cfg["TAXONOMY_TABLE"]}
-                ON moth_records.MothName = {cfg["TAXONOMY_TABLE"]}.MothName
-            GROUP BY Year, MothFamily
-    ) gc
-    GROUP BY Family ORDER BY `Annual Average` DESC;"""
+    if cfg["USE_SQLITE"]:
+        sql_string = f"""
+        SELECT MothFamily Family, round(avg(Count)+0.49) `Annual Average` FROM
+        (
+            SELECT strftime("%Y", Date) Year,  MothFamily,  sum(MothCount) Count
+                FROM moth_records INNER JOIN {cfg["TAXONOMY_TABLE"]}
+                    ON moth_records.MothName = {cfg["TAXONOMY_TABLE"]}.MothName
+                GROUP BY Year, MothFamily
+        ) gc
+        GROUP BY Family ORDER BY `Annual Average` DESC;"""
+    else:
+        sql_string = f"""
+        SELECT MothFamily Family, ceil(avg(Count)) `Annual Average` FROM
+        (
+            SELECT year(Date) Year,  MothFamily,  sum(MothCount) Count
+                FROM moth_records INNER JOIN {cfg["TAXONOMY_TABLE"]}
+                    ON moth_records.MothName = {cfg["TAXONOMY_TABLE"]}.MothName
+                GROUP BY Year, MothFamily
+        ) gc
+        GROUP BY Family ORDER BY `Annual Average` DESC;"""
 
     sql_df = get_table(sql_string)
 
@@ -1067,18 +1126,32 @@ def update_mothnames():
 def species():
     """ Show  list of moths caught to date. """
     # Get Avg catch per year by TVK
-    avg_per_year = get_table(
-        f"""
-            SELECT TVK, ceil(avg(Total)) "Annual Average"
-                FROM (
-                    SELECT Year(Date) Year, MothName, TVK,
-                    Sum(MothCount) Total, MothGenus, MothSpecies
-                        FROM
-                        (moth_records JOIN {cfg["TAXONOMY_TABLE"]} USING (MothName))
-                        GROUP BY Year, TVK
-                ) yt GROUP BY TVK ORDER BY avg(Total) DESC
-                ;"""
-    )
+
+    if cfg["USE_SQLITE"]:
+        # Sadly SQLITE doesn't include ceil by default hence the hack of adding 0.49
+        avg_per_year = get_table(
+            f"""SELECT TVK, round(avg(Total)+0.49) "Annual Average"
+                    FROM (
+                        SELECT strftime("%Y", Date) Year, MothName, TVK,
+                        Sum(MothCount) Total, MothGenus, MothSpecies
+                            FROM
+                            (moth_records JOIN {cfg["TAXONOMY_TABLE"]} USING (MothName))
+                            GROUP BY Year, TVK
+                    ) yt GROUP BY TVK ORDER BY avg(Total) DESC
+                    ;"""
+        )
+    else:
+        avg_per_year = get_table(
+            f"""SELECT TVK, ceil(avg(Total)) "Annual Average"
+                    FROM (
+                        SELECT Year(Date) Year, MothName, TVK,
+                        Sum(MothCount) Total, MothGenus, MothSpecies
+                            FROM
+                            (moth_records JOIN {cfg["TAXONOMY_TABLE"]} USING (MothName))
+                            GROUP BY Year, TVK
+                    ) yt GROUP BY TVK ORDER BY avg(Total) DESC
+                    ;"""
+        )
 
     # Get a map of all MothNames to TVK
     map_tvk2m = (
@@ -1181,17 +1254,30 @@ def show_latest():
             ORDER BY Date DESC LIMIT 14) dates
             USING (Date) ORDER BY Date;"""
     )
+    print(recent_df)
+    try:
+        earliest_table_date = min(recent_df.Date)
+    except:
+        earliest_table_date = str(dt.date.today())
 
-    earliest_table_date = min(recent_df.Date)
-
-    seen_before = get_table(
-        f"""SELECT MothName, YEAR(Max(Date)) Year, TVK FROM
-                (SELECT * FROM moth_records WHERE
-                    Date < Date("{earliest_table_date}") ) mr
-                JOIN
-                {cfg["TAXONOMY_TABLE"]} USING (MothName)
-        GROUP BY MothName;"""
-    )
+    if cfg["USE_SQLITE"]:
+        seen_before = get_table(
+            f"""SELECT MothName, strftime("%Y", Max(Date)) Year, TVK FROM
+                    (SELECT * FROM moth_records WHERE
+                        Date < Date("{earliest_table_date}") ) mr
+                    JOIN
+                    {cfg["TAXONOMY_TABLE"]} USING (MothName)
+            GROUP BY MothName;"""
+        )
+    else:
+        seen_before = get_table(
+            f"""SELECT MothName, YEAR(Max(Date)) Year, TVK FROM
+                    (SELECT * FROM moth_records WHERE
+                        Date < Date("{earliest_table_date}") ) mr
+                    JOIN
+                    {cfg["TAXONOMY_TABLE"]} USING (MothName)
+            GROUP BY MothName;"""
+        )
 
     not_nft_tvk = seen_before.TVK.to_list()
     not_ffy_tvk = seen_before[seen_before.Year == dt.date.today().year].TVK.to_list()
@@ -1203,8 +1289,13 @@ def show_latest():
         for mn, tvk in table_moths.items()
         if tvk not in not_ffy_tvk and mn not in nft
     ]
+    try:
+        recent_df["Date"] = recent_df["Date"].apply(lambda dd: dd.strftime("%Y-%m-%d"))
+    except AttributeError:
+        # This probably failed because the date was already a string if using SQLITE
+        if not cfg["USE_SQLITE"]:
+            raise
 
-    recent_df["Date"] = recent_df["Date"].apply(lambda dd: dd.strftime("%Y-%m-%d"))
     recent_df["Species"] = recent_df["MothName"]
     recent_df.set_index(["Date", "MothName", "Species"], inplace=True)
 
@@ -1325,7 +1416,8 @@ def export_page():
     # Determine oldest record
     earliest_record = get_table("SELECT MIN(Date) Earliest FROM moth_records;")[
         "Earliest"
-    ][0]
+    ][0] or dt.date.today()
+
     moth_logger.debug(">>>>", earliest_record.year)
     return template(
         "export", e_year=earliest_record.year, e_month=earliest_record.month

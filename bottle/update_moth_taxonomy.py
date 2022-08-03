@@ -97,7 +97,10 @@ def update_check():
 
 def get_db_connection():
     if cfg["USE_SQLITE"]:
-        cnx = sqlite3.connect(cfg["SQLITE_PATH"] + cfg["SQLITE_FILE"])
+        cnx = sqlite3.connect(
+            cfg["SQLITE_PATH"] + cfg["SQLITE_FILE"],
+            isolation_level=None
+        )
     else:
         cnx = mariadb.connect(**sql_config)
     return cnx
