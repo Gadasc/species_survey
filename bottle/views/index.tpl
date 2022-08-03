@@ -1,8 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <script src="/static/vue.js"></script>
-    <script src="/static/common_names.js"></script>
+    <meta http-equiv="cache-control" content="no-cache" />
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.7.0"></script>
+    <script src="/static/common_names.js?"></script>
     <link rel="stylesheet" type="text/css" href="/static/vue_survey.css">
     <link rel="stylesheet" type="text/css" href="/static/mothmenu.css">
 </head>
@@ -52,6 +53,7 @@
                 v-on:keyup.enter="select_species(matched_names[highlighted_species])"
                 v-on:keyup.esc.prevent="clear_search" 
                 v-model="search_text"
+                autofocus
                 />
             <div class="match_list_item">
             <match-item  
@@ -73,12 +75,12 @@
         props: ['current_moths'],
         computed: {
             lower_search_text: function(){
-                return this.search_text.toLowerCase();
+                return this.search_text.toLowerCase().replace(/[^a-z]/g, " ");
             }
         },
         methods: {
             match_filter: function(mname) {
-                return mname.toLowerCase().includes(this.lower_search_text) && !this.current_moths.includes(mname.toLowerCase());
+                return mname.toLowerCase().replace(/[^a-z]/g, " ").includes(this.lower_search_text) && !this.current_moths.includes(mname.toLowerCase());
             },
             list_candidates: function(event){
                 console.log("Search changed(event): " + this.search_text);

@@ -32,6 +32,11 @@ body {
 
 .recent {
   text-align: center;
+  background-color: inherit;
+}
+
+td {
+  background-color: inherit;
 }
 
 .count {
@@ -45,7 +50,7 @@ body {
   background-color: #f1f1f1;
   padding: 0px;
   word-wrap: break-word;
-  width: 20%; 
+  width: 350px; 
   padding: 0px;
   font: 36px Arial;
   text-align: center;
@@ -55,26 +60,54 @@ body {
   font-size: initial;
 }
 
+input[list] {
+  background-color: #eee;
+}
+
+input[list]:disabled {
+  color: #ccc;
+}
+
 input {
   border: 1px solid transparent;
   background-color: inherit;
   padding: 0px;
   word-wrap: break-word;
-  width: 100%; 
+  /*width: 100%;*/ 
   padding: 0px;
   font: 36px Arial;
+  color: inherit;
 }
 
+input[type="checkbox"] {
+  transform: scale(2);
+  vertical-align: middle;
+  width: 30px;
+}
+
+select {
+  border: 1px solid transparent;
+  background-color: transparent;
+  padding: 0px;
+  word-wrap: break-word;
+  /*width: 100%;*/ 
+  padding: 0px;
+  font: 36px Arial;
+  color: inherit;
+}
 
 input[type=submit] {
   background-color:  #b9c9df;
   font: inherit;
   color: #fff;
+  font: 36px Arial;
+  float: right;
 }
 
 button {
-  font-size: 64px;
+  font-size: 32px;
   touch-action: manipulation;
+  float: right;
 }
 
 input[type=button] {
@@ -108,7 +141,7 @@ input[type=button] {
 
 .match_list_item div:hover {
   /*when hovering an item:*/
-  background-color: #e9e9e9; 
+  background-color: red; 
 }
 
 .match_list_item-active {
@@ -117,10 +150,21 @@ input[type=button] {
   color: #ffffff; 
 }
 
+.match_list_item-included {
+  /*when navigating through the items using the arrow keys:*/
+  /* background-color: DodgerBlue !important; */ 
+  color: #aaa; 
+}
+
+
 table, th, tr {
   border: 1px solid black; 
   border-collapse: collapse; 
   empty-cells: show;
+}
+
+th {
+  padding: 0px 10px;
 }
 
 tr:nth-child(even) {background-color: #f2f2f2}
@@ -130,4 +174,46 @@ tr:nth-child(even) {background-color: #f2f2f2}
   color: #7092be;
   font-size: larger;
  
-}    
+}   
+
+.virgin {
+  color: #92be70;
+}
+
+.updated {
+  color: 	#be7092;
+}
+
+.flash {
+  animation: myflash 1s normal ease-out;
+  animation-fill-mode: backwards;
+}
+
+@keyframes myflash {
+  from {background-color: #7092be;}
+/*  to {background-color: initial;} */
+}
+
+.def_detail {
+  color: #888;
+}
+
+.col_count {
+  width: 100px;
+  text-align: center;
+}
+
+.detail_list {
+  list-style: none;
+  padding-inline-start: 20px;
+  margin-block-start: 10px;
+}
+
+.detail_title {
+  width: 170px;
+  display: inline-block;
+}
+
+#mothsForm {
+  display: inline-block;
+}

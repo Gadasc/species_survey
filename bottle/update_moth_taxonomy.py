@@ -7,12 +7,24 @@ Using the date in the name it will check against any stored date.
 If the new date is newer (or old date doesn't exist) the irecord_taxonomy table
 will be (re)written.
 
+History
+-------
+14 July 2022 - Added support for sqlite3
+14 July 2020 - Added code to add the recorder, location and trap tables
+26 June 2020 - Added indexes
+20 June 2020 - Made sure list going into common_names.js is sorted.
+   June 2020 - Genesis
+
 """
-import pandas as pd
-import mysql.connector as mariadb
-import os
+
 import datetime as dt
 import glob
+import logging
+import mysql.connector as mariadb
+import os
+import pandas as pd
+import sqlite3
+import warnings
 
 # Can't call this twice without messing things up.
 # TODO: get rid of the global variables and
@@ -39,7 +51,7 @@ def update_mothnames():
 
     with open("./static/common_names.js", "w") as fnames:
         fnames.write("var common_names = [")
-        for n in names.MothName:
+        for n in sorted(names.MothName):
             fnames.write('"' + n + '", ')
         fnames.write("];")
 
@@ -69,10 +81,11 @@ def update_check():
         pass
 
     if (
-        last_update_date
-        and newest_table_date
+        newest_table_date
         and int(newest_table_date) > int(last_update_date)
-    ) or (newest_table_date and not last_update_date):
+        or newest_table_date
+        and not last_update_date
+    ):
         print("Finally decided to update table")
         print(f"Last update: {last_update_date or 'Never!'}")
         print(f"Latest list: {newest_table_date or 'Not found!'}")
@@ -82,8 +95,20 @@ def update_check():
     return newest_table_name
 
 
+def get_db_connection():
+    if cfg["USE_SQLITE"]:
+        cnx = sqlite3.connect(
+            cfg["SQLITE_PATH"] + cfg["SQLITE_FILE"],
+            isolation_level=None
+        )
+    else:
+        cnx = mariadb.connect(**sql_config)
+    return cnx
+
+
 def update_table(tablename, filename):
-    cnx = mariadb.connect(**sql_config)
+#    cnx = mariadb.connect(**sql_config)
+    cnx = get_db_connection()
     cursor = cnx.cursor()
     rv = True
 
@@ -111,17 +136,20 @@ def update_table(tablename, filename):
         msi = list(names_df.columns).index("MothSpecies")
         mni = list(names_df.columns).index("MothName")
         print(mgi, msi)
+        # Avoid duplicating scientific name entries
+        taxons_added = set()
         for _, *row in names_df.itertuples():
             cursor.execute(
                 f"INSERT INTO {tablename} ({cols}) VALUES ({subs});", tuple(row)
             )
             taxon = f"{row[mgi]} {row[msi]}"
-            if row[mni] != taxon:
+            if row[mni] != taxon and taxon not in taxons_added:
                 # print((taxon, *row[1:]))
                 cursor.execute(
                     f"INSERT INTO {tablename} ({cols}) VALUES ({subs});",
                     (taxon, *row[1:]),
                 )
+                taxons_added.add(taxon)
 
     except ModuleNotFoundError:
         rv = False
@@ -137,12 +165,31 @@ def get_table(sql_query):
 
     # Establish a connection to the SQL server
     # print(sql_config)
-    cnx = mariadb.connect(**sql_config)
+    #cnx = mariadb.connect(**sql_config)
+    cnx = get_db_connection()
     cursor = cnx.cursor()
 
-    cursor.execute(sql_query)
+    try:
+        cursor.execute(sql_query)
+    except:
+        logging.error(f"{sql_query} raised an SQL issue!")
+        raise
+
     data_list = [list(c) for c in cursor]
-    count_df = pd.DataFrame(data_list, columns=list(cursor.column_names))
+
+    if cfg["USE_SQLITE"]:
+        try: 
+            columns = [c[0] for c in cursor.description]
+        except TypeError:
+            columns = None
+            logging.warn(f"{sql_query} does not generate a table!")
+        except sql.OperationalError:
+            logging.error(f"{sql_query} raised an SQL issue!")
+            raise
+    else:
+        columns = list(cursor.column_names)
+
+    count_df = pd.DataFrame(data_list, columns=columns)
 
     cursor.close()
     cnx.close()
@@ -160,7 +207,8 @@ def update_records(mapfile_name):
     # Get list of names in records
     unique_names = get_table("SELECT MothName FROM moth_records GROUP BY MothName;")
 
-    cnx = mariadb.connect(**sql_config)
+#    cnx = mariadb.connect(**sql_config)
+    cnx = get_db_connection()
     cursor = cnx.cursor()
 
     for mname in unique_names["MothName"]:
@@ -186,9 +234,89 @@ def update_records(mapfile_name):
     return True
 
 
+def set_column_default(col_name, def_value):
+    """ Encapsulates the methods for updating the column defaults
+    """
+
+    if def_value in ["NULL", None, ""]:  # Seems hacky to me but "NULL" won't work
+        print("Really setting defauly to NULL")
+        get_table(f"""ALTER TABLE moth_records ALTER {col_name} SET DEFAULT NULL;""")
+    else:
+        get_table(
+            f"""ALTER TABLE moth_records ALTER {col_name} SET DEFAULT "{def_value}";"""
+        )
+
+    # If any entries are NULL set to default
+    get_table(
+        f'UPDATE moth_records SET {col_name}="{def_value}"'
+        f' WHERE  {col_name} IN (NULL, "NULL", "", "None");'
+    )
+
+
+def get_column_default(col_name):
+    """ Encapsulates the retrieval of a column default value
+    """
+    if cfg["USE_SQLITE"]:
+        records_description = get_table("PRAGMA table_info(moth_records);").set_index("name")
+        try:
+            rv = records_description.loc[col_name]["dflt_value"]
+        except KeyError:
+            rv = None
+        
+    else:
+        records_description = get_table("DESCRIBE moth_records;").set_index("Field")
+        try:
+            rv = records_description.loc[col_name]["Default"]
+        except KeyError:
+            rv = None
+
+    return rv
+
+
 def update_table_moth_taxonomy():
     # TODO Turn off auto commit so we can roll back if issues are found
 
+    # TODO Move to a function to ensure the databases are up to date
+    get_table(
+        f"CREATE INDEX IF NOT EXISTS tax_MothName ON {cfg['TAXONOMY_TABLE']}(MothName);"
+    )
+    get_table(f"CREATE INDEX IF NOT EXISTS tax_TVK ON {cfg['TAXONOMY_TABLE']}(TVK);")
+    get_table(f"CREATE INDEX IF NOT EXISTS rec_MothName ON moth_records(MothName);")
+    get_table(f"CREATE INDEX IF NOT EXISTS rec_Date ON moth_records(Date);")
+
+    # Ensure additional columns exist - don't set default.
+    # If no value set, then it will get automatically updated when the first
+    # default is set.
+    if not cfg["USE_SQLITE"]:
+        get_table("ALTER TABLE moth_records ADD COLUMN IF NOT EXISTS" " Recorder CHAR(30);")
+        get_table("ALTER TABLE moth_records ADD COLUMN IF NOT EXISTS" " Trap CHAR(30);")
+        get_table("ALTER TABLE moth_records ADD COLUMN IF NOT EXISTS" " Location CHAR(30);")
+    else:
+        # SQLITE doesn't support the IF NOT EXISTS clause on ALTER TABLE
+        try:
+            get_table("ALTER TABLE moth_records ADD COLUMN Recorder CHAR(30);")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            get_table("ALTER TABLE moth_records ADD COLUMN Trap CHAR(30);")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            get_table("ALTER TABLE moth_records ADD COLUMN Location CHAR(30);")
+        except sqlite3.OperationalError:
+            pass
+        warnings.warn("FUTURE PROOFING: Need to add code to handle the addition of new columns")
+
+    # Create supplimentaty tables for Recorders, Traps and Locations.
+    get_table("CREATE TABLE IF NOT EXISTS recorders_list (Recorder CHAR(30) NOT NULL);")
+    get_table("CREATE TABLE IF NOT EXISTS traps_list (Trap CHAR(30) NOT NULL);")
+    get_table(
+        "CREATE TABLE IF NOT EXISTS locations_list "
+        "(Name CHAR(30) NOT NULL, OSGB_Grid CHAR(15));"
+    )
+
+    # Main function starts here
+    #
     # Check if an updated list exists
     update_list_file = update_check()
     if not update_list_file:

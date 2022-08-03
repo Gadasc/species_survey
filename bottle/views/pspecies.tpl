@@ -10,27 +10,24 @@
 
 <body>
 % include("menu_moth.tpl")
-<h1>{{genus}}</h1>
+<h1>{{species}}</h1>
+<div>{{!taxonomy}}</div>
 
-<div style="position: relative;" id="genusGraph">
+<div id="mothGraph">
+
 </div>
 
-<div>
-<ul>
-<%
-list_items = ""
-for s in species:
-    list_items += f"<li><a href='/species/{s}'>{s}</a></li>"
-    end
-%>
-{{!list_items}}
-</ul>
+
+<div style="width: 800px;">
+{{!catches}}
 </div>
 
 
 </body>
 
 <script>
-    Plotly.newPlot('genusGraph', {{!gg}});
+    Plotly.newPlot('mothGraph', {{!plotly_data}});
 </script>
+
+
 </html>

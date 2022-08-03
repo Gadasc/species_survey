@@ -1547,7 +1547,6 @@ Leucinodes vagans,Crambidae,Spilomelinae,Leucinodes,vagans,NHMSYS0000503040
 Aubergine Pearl,Crambidae,Spilomelinae,Leucinodes,orbonalis,NHMSYS0000503039
 African Tomato Pearl,Crambidae,Spilomelinae,Sceliodes,laisalis,NHMSYS0000504096
 American Rush Veneer,Crambidae,Spilomelinae,Nomophila,nearctica,NHMSYS0000503398
-Boxworm,Crambidae,Spilomelinae,Cydalima,perspectalis,NHMSYS0021143739
 Grass Webworm,Crambidae,Spilomelinae,Herpetogramma,licarsisalis,MM0001Z1GPZNU1ZJ
 Starry Pearl,Crambidae,Odontiinae,Cynaeda,dentalis,NHMSYS0020470266
 Garden Pebble,Crambidae,Glaphyriinae,Evergestis,forficalis,NHMSYS0000502668
@@ -1865,7 +1864,7 @@ Thyme Pug,Geometridae,Larentiinae,Eupithecia,distinctaria,NHMSYS0000520033
 Lime-speck Pug,Geometridae,Larentiinae,Eupithecia,centaureata,NHMSYS0021144104
 Pinion-spotted Pug,Geometridae,Larentiinae,Eupithecia,insigniata,NHMSYS0000502605
 Triple-spotted Pug,Geometridae,Larentiinae,Eupithecia,trisignaria,NHMSYS0000502623
-Eupithecia intricata,Geometridae,Larentiinae,Eupithecia,intricata,NBNSYS0000005912
+Freyer's Pug,Geometridae,Larentiinae,Eupithecia,intricata subsp. arceuthata,NBNSYS0000005913
 Satyr Pug,Geometridae,Larentiinae,Eupithecia,satyrata,NBNSYS0000005916
 Scarce Pug,Geometridae,Larentiinae,Eupithecia,extensaria,NHMSYS0000520043
 Wormwood Pug,Geometridae,Larentiinae,Eupithecia,absinthiata,NBNSYS0000005918
@@ -2558,7 +2557,6 @@ Cumbrian Umber,Geometridae,Larentiinae,Horisme,aquata,NHMSYS0000502880
 Doubleday's Pug,Geometridae,Larentiinae,Eupithecia,cauchiata,NBNSYS0000005917
 Light Magpie,Geometridae,Ennominae,Abraxas,pantaria,NBNSYS0000005977
 Dingy Angle,Geometridae,Ennominae,Macaria,bicolorata,NBNSYS0100003854
-White Spot,Geometridae,Ennominae,Hypagyrtis,unipunctata,NBNSYS0000005989
 Clouded August Thorn,Geometridae,Ennominae,Ennomos,quercaria,NHMSYS0000502381
 Dusky Carpet,Geometridae,Ennominae,Tephronia,sepiaria,NBNSYS0100005782
 Local Long-tailed Satin,Notodontidae,,Trichiocercus,sparshalli,NHMSYS0000504572
@@ -2582,10 +2580,19 @@ Triple-barred,Erebidae,Catocalinae,Mocis,trifasciata,NBNSYS0000006564
 Autumnal Snout,Erebidae,Strepsimaninae,Schrankia,intermedialis,NBNSYS0000006588
 Waved Tabby,Erebidae,Herminiinae,Idia,aemula,NHMSYS0000502937
 Twin-striped Tabby,Erebidae,Herminiinae,Idia,lubricalis,NBNSYS0000006591
-Box-tree Moth,Crambidae,SpilomeBoxlinae,Cydalima,perspectalis,NHMSYS0021143739
+Box-tree Moth,Crambidae,Spilomelinae,Cydalima,perspectalis,NHMSYS0021143739
 White-speck,Noctuidae,Hadeninae,Mythimna,unipuncta,NBNSYS0000006296
-Freyer's Pug,Geometridae,Larentiinae,Eupithecia,intricata,NBNSYS0000005912
-Marbled Minor agg.,Noctuidae,Xyleninae,Oligia,strigilis agg,NHMSYS0001703675
+Riband Wave (non-banded form),Geometridae,Sterrhinae,Idaea,aversata ab. remutata,NHMSYS0001753611
+Peppered Moth (light),Geometridae,Ennominae,Biston,betularia form typica,NHMSYS0020677063
+Peppered Moth (intermediate),Geometridae,Ennominae,Biston,betularia form insularia,NBNSYS0100002008
+Peppered Moth (dark),Geometridae,Ennominae,Biston,betularia form carbonaria,NBNSYS0100002007
+Marbled Minor agg.,Noctuidae,Xyleninae,Oligia,strigilis agg.,NHMSYS0001703675
 Footman Agg.,Erebidae,,Eilema,,NHMSYS0000519588
 November Moth agg.,Geometridae,Larentiinae,Epirrita,,NHMSYS0001703669
 Pug Agg.,Geometridae,Larentiinae,Eupithecia,,NHMSYS0000520023
+Copper Underwing agg.,Noctuidae,Amphipyrinae,Amphipyra,pyramidea agg.,NBNSYS0000006393
+Ear Moth agg.,Noctuidae,Xyleninae,Amphipoea,oculea agg.,NHMSYS0001703666
+Common Rustic agg.,Noctuidae,Xyleninae,Mesapamea,secalis agg.,NBNSYS0000006441
+Grey/Dark Dagger,Noctuidae,Acronictinae,Acronicta,psi/tridens,NHMSYS0001703742
+Uncertain/Rustic,Noctuidae,,Hoplodrina,octogenaria/blanda,NHMSYS0021238182
+Red/Dark-barred Twin-spot Carpet,Geometridae,Larentiinae,Xanthorhoe,spadicearia/ferrugata,NHMSYS0001703678

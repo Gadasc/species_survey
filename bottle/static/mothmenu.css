@@ -1,5 +1,6 @@
 body {
 	font-family:"HelveticaNeue","Helvetica Neue",Helvetica,Arial,sans-serif;
+	font-size: 36px;
 }
 
 h1 {
@@ -18,11 +19,12 @@ h1 {
 
 .top_menu UL{
 	position:relative;
-	float:left;
 	left:0;
 	margin:0;
 	padding:0;
-    background: #7092BE;
+	background: #7092BE;
+	/*height: 100%; */
+	display: table;
 }
 
 .top_menu LI{
@@ -34,7 +36,7 @@ h1 {
 	font-weight: bold;	
 	text-align: center;
 	position: relative;
-    
+	/*height: 100%;*/
 }
 
 
@@ -47,8 +49,8 @@ h1 {
 
 .top_menu UL UL {
 	padding:0;  
-	display:none;
-	z-index: 100;
+	display: none;
+	/*z-index: 100; */
 }
 
 .top_menu LI:hover {
@@ -58,15 +60,17 @@ h1 {
 .top_menu UL LI:hover>UL {
 	position:absolute;
 	display:block;
-	z-index:100;
+	z-index:0;
 }
 
-<!-- Fine tuning formating defines -->
-<!-- ----------------------------- -->
-<!-- Pull the over skeleton into a -->
-<!-- reusable file.                -->
+.top_menu UL UL > LI {
+	width: 180px;
+	text-align: left;
+	padding-left: 5px;
 
-.top_menu LI{
+}
+
+.top_menu LI {
 	font-family:"HelveticaNeue","Helvetica Neue",Helvetica,Arial,sans-serif;
 }
 

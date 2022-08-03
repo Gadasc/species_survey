@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <script src="/static/vue.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.7.0"></script>
     <script src="/static/manifest.js"></script>
-    <script src="/static/common_names.js"></script>
+    <script src="/static/common_names.js?"></script>
     <link rel="stylesheet" type="text/css" href="/static/vue_survey.css">
     <link rel="stylesheet" type="text/css" href="/static/mothmenu.css">
 </head>
@@ -13,9 +13,33 @@
 <div id="app"  />
 </body>
 
-
-
 <script>
+
+    // This code will look for a cookie "delete_cache_date" and delete the sessionStorage 
+    // data with that key. Finally the cookie is removed.
+    var cindex = document.cookie.indexOf("delete_cache_date="); 
+    console.log("cindex=", cindex);
+    if (cindex != -1){
+        dash_date_string = document.cookie.substr(cindex+"delete_cache_date=".length, "YYYY-MM-DD".length);
+        console.log("dash_date_string=", dash_date_string);
+        sessionStorage.removeItem(dash_date_string);
+        document.cookie = "delete_cache_date=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+    }
+
+    // Helper functions to store updates in sessionStorage until successfully commited.
+    // This protects against accidentally leaving the page, or network failures.
+    function cache_update_species(species_obj){
+        record_cache[species_obj.species] = species_obj;
+        sessionStorage.setItem("{{!dash_date_str}}", JSON.stringify(record_cache));
+    }
+
+    function cache_update_detail_options(detail_obj){
+        // Finally recover details
+        console.log("Updating details")
+        localStorage.setItem("detail_cache", JSON.stringify(detail_obj));
+    }
+
+
     Vue.component('table-row', {
         template: `
             <tr><td>\{\{record.species\}\}</td></tr>
@@ -23,26 +47,79 @@
         props:['record']
     })
 
+
     Vue.component('moth-entry', {
-        template: `<tr>
-                   <td>\{\{moth_record.species\}\}</td>
-                   <td class="recent">\{\{moth_record.recent\}\}</td>
+        template: `<tr v-bind:class="{'virgin' : isVirgin, 'updated': isUpdated, 'flash': flash_flag}" :id="uriSpecies">
+                   <td>\{\{moth_record.species\}\}<input type="hidden" v-bind:name="moth_record.species" v-model="safeJSONMothObject"></td>
                    <td><button class="round_button" v-on:click.prevent='decrement'>-</button></td>
-                   <td class="count"><input v-bind:name="moth_record.species" v-model="moth_record.count"></td>
+                   <td class="count"><input class="col_count" v-model="moth_record.count" data-lpignore="true" v-on:change="validate_count"></td>
                    <td><button class="round_button" v-on:click.prevent="increment">+</button></td>
+                   <td class="recent">\{\{moth_record.recent\}\}</td>
+                   
+                   <sample-detail 
+                        v-for="opt in detail_options" 
+                        :sampleDetail="moth_record[opt.name.toLowerCase()]" 
+                        :detailOptions="opt" 
+                        v-on:detail-change="detail_change" 
+                        :key="opt.name"
+                        :hidden="opt.hidden"
+                    />
                    </tr>
                    `,
-        props: ['moth_record'],
+        props: ['moth_record', 'detail_options'],
+        data: function(){
+            return {
+                flash_flag: false,
+            }
+        },
         methods: {
             decrement: function(){
                 console.log("Decrement", this.moth_record.species)
                 if (this.moth_record.count > 0){
                     this.moth_record.count -= 1;
+                    /* this.moth_record.virgin = false;*/
+                    this.moth_record.updated = true;
+                    cache_update_species(this.moth_record);
                 }
             },
             increment: function(){
-                console.log("Increment", this.moth_record.species)
-                this.moth_record.count += 1
+                console.log("Increment", this.moth_record.species);
+                this.moth_record.count += 1;
+                /* this.moth_record.virgin = false; */
+                this.moth_record.updated = true;
+                cache_update_species(this.moth_record);
+            },
+            setFlashFlag: function(bval){
+                this.flash_flag = bval;
+            },
+            detail_change: function(event){
+                /* An optional detail changed - reflect in moth details */
+                console.log("Updating details for: ", this.moth_record.species, " ", event.name, "=>", event.value);
+                this.moth_record[event.name.toLowerCase()] = event.value;
+                this.moth_record.updated = true;
+                cache_update_species(this.moth_record);
+            },
+            validate_count: function(){
+                console.log(this.moth_record.species, " Count: ", this.moth_record.count);
+                if (isNaN(this.moth_record.count)){
+                    this.moth_record.count = 0;
+                }
+            }
+
+
+        },
+        computed: {
+            isVirgin: function(){
+                return this.moth_record.virgin && (this.moth_record.count == this.moth_record.orig_count);
+            },
+            isUpdated: function(){
+                return (this.moth_record.count != this.moth_record.orig_count);
+            },
+            uriSpecies: function(){
+                return encodeURI(this.moth_record.species);
+            },
+            safeJSONMothObject: function(){
+                return JSON.stringify(this.moth_record);
             }
         }
     })
@@ -65,8 +142,8 @@
         template: `
             <div class="match_list_container">
             <input type="text"
-                autocomplete="off" 
-                placeholder="New moth" 
+                placeholder="New moth"
+                id="moth_search" 
                 v-on:input="list_candidates" 
                 v-on:keyup.down="process_down_event" 
                 v-on:keyup.up="process_up_event"
@@ -80,7 +157,8 @@
                 v-bind:match_species=match 
                 v-bind:key=match 
                 v-on:clicked_me="select_species" 
-                v-bind:class='{"match_list_item-active": (match === matched_names[highlighted_species])}' />
+                v-bind:class='{"match_list_item-active": (match === matched_names[highlighted_species]), 
+                               "match_list_item-included": (current_moths.includes(match.toLowerCase()))}' />
             </div>
             </div>
             `,
@@ -94,12 +172,13 @@
         props: ['current_moths'],
         computed: {
             lower_search_text: function(){
-                return this.search_text.toLowerCase();
+                return this.search_text.toLowerCase().replace(/[^a-z]/g, " ");
             }
         },
         methods: {
             match_filter: function(mname) {
-                return mname.toLowerCase().includes(this.lower_search_text) && !this.current_moths.includes(mname.toLowerCase());
+                return mname.toLowerCase().replace(/[^a-z]/g, " ").includes(this.lower_search_text);
+                    /* I want to include already selected items && !this.current_moths.includes(mname.toLowerCase()); */
             },
             list_candidates: function(event){
                 this.search_text = event.target.value;
@@ -121,7 +200,9 @@
                 // Only add the species if it is valid
                 if(value !== "" && typeof value !== 'undefined') {
                     this.$emit("add-species", this.selected_species)
+
                 }
+
             } ,
             process_down_event: function(event){
                 console.log("auto-list-box DOWN: " + event.type );
@@ -145,36 +226,149 @@
         }
     })
 
+
+    Vue.component("sample-detail", {
+        template: `
+            <td>
+            <select :class="{'def_detail' : isDefDetail}" v-bind:value="myDetail" v-on:change="on_select">
+                <option v-for="opt in detailOptions.list" :value="opt" :key="opt">
+                    \{\{ dispAbbrev( opt ) \}\}
+                </option>
+            </select>
+            </td>
+        `,
+        props: ["detailOptions", "sampleDetail"],
+        computed: {
+            myDetail: function() {
+                return this.sampleDetail ? this.sampleDetail : this.detailOptions.default;
+            },
+            isDefDetail: function() {
+                return this.sampleDetail == false;
+            },
+            myAbbrev: function(){
+                return this.myDetail.replace(/[^A-Z]/g, "");
+            },
+        },
+        methods: {
+            dispAbbrev: function(fullText){
+                return fullText.replace(/[^A-Z]/g, "");
+            },
+            on_select: function(event){
+                console.log("Over-ridden default with", event.target.value);
+                this.$emit('detail-change', {name: this.detailOptions.name, value: event.target.value});
+            }
+
+        }
+    })
+
+    Vue.component("page-option", {
+        template: `<li>
+                    <input type="checkbox" v-model:value="option_config.hidden"  :true-value="myfalse" :false-value="mytrue"/> 
+                    <span class="detail_title">\{\{option_config.name\}\}: </span>
+                    <select :name="option_name" v-bind:value="value" v-on:change="on_select">
+                        <option v-for="opt in option_config.list" v-bind:value="opt" :key="opt.name">\{\{opt\}\}</option>
+                     </select>
+                    </li>`,
+        props: ['option_config', 'value'],
+        data: function(){
+            return {
+                myfalse: false,
+                mytrue: true
+            }
+        },
+        computed: {
+            option_name: function(){
+                return "option_"+this.option_config.name;
+            },
+        },
+        methods: {
+            on_select: function(event){
+                console.log("changed default", event.target.value);
+                this.$emit('change', {name: this.option_config.name, value: event.target.value});
+            },
+        }
+
+    })
+
+
     vm = new Vue({
         el: '#app',
         template: `    
         <div>
-        <form id="mothsForm" autocomplete="off" action="/handle_survey" method="post" v-on:keydown.enter.prevent>
+        <form id="mothsForm" autocomplete="off"  action="/handle_survey" method="post" v-on:keydown.enter.prevent>
         Date: <a class=daynav v-bind:href=yesterday>&#9664;</a>
-              <input class="survey_date" type="text" name="dash_date_str"  value="{{!dash_date_str}}" readonly>
-              <a class=daynav v-bind:href=tomorrow>&#9654;</a></p>
+              <input class="survey_date"  type="date" name="dash_date_str" v-bind:max="get_today_str" v-model:value="this_date" required @change="jumpDate">
+              <a class=daynav v-bind:href=tomorrow>&#9654;</a><button type="submit">Submit</button></p>
+        </p>    
         <table>
-        <thead><tr><th>Species</th><th>Recent</th><th></th><th>Count</th><th></th></tr></thead>
+        <thead><tr><th>Species</th><th></th><th class="col_count">Count</th><th></th><th>Recent</th>
+            <th v-for="oc in detail_options" :hidden="oc.hidden" >\{\{ oc.column_hdr \}\}</th></tr></thead>
         <tbody>
-            <tr><td colspan="5" style="width: 100%;"><auto-list-box v-on:add-species="add_species" v-bind:current_moths="current_moths"></auto-list-box></td>
+            <tr><td colspan="8" style="width: 100%;"><auto-list-box v-on:add-species="add_species" v-bind:current_moths="current_moths"></auto-list-box></td>
             </tr>
-            <moth-entry v-for="moth in moths" v-bind:key='moth.species' v-bind:moth_record='moth' />
+            <moth-entry v-for="moth in moths" v-bind:key='moth.species' v-bind:moth_record='moth' :detail_options='detail_options' :ref='moth.species' />
         </tbody>
         </table>
-        <button type="submit">Submit</button>
+        </p>
+        <div style="display: inline-block;">
+        <ul class="detail_list"><strong>Defaults</strong>
+        <page-option v-for="oc in detail_options" :option_config="oc" :key="oc.name" v-model:value="oc.default" v-on:change="detailHandler" />
+        </ul>
+        </div>
+        <button type="submit">Submit</button></p>
         </form>
         </div>
         `,
        
-        data: function() {
-            return {
-                moths: []
+        data: {
+                moths: [],
+                this_date: "{{!dash_date_str}}",
+                detail_options: {
+                    "Location": {name: "Location", list: {{!location_list}}, default: "{{!default_location}}", column_hdr: "Loc", hidden: true},
+                    "Recorder": {name: "Recorder", list: {{!recorder_list}}, default: "{{!default_recorder}}", column_hdr: "Rec", hidden: true},
+                    "Trap": {name: "Trap", list: {{!trap_list}}, default: "{{!default_trap}}", column_hdr: "Trap", hidden: true}
+                }
+        },
+        watch: {
+            detail_options: {
+                handler(val) {
+                    cache_update_detail_options(val);
+                },
+                deep: true
             }
         },
         methods: {
             add_species: function(new_species){
+                /* Guard against adding the same moth twice */
+                console.log("Adding:", new_species);
+                if (this.moths.map(function(i){console.log(i["species"]); return i["species"];}).includes(new_species)) {
+                    console.log("Scrolling to existing - ", new_species);
+                    var uri_ns = encodeURI(new_species);
+                    var es = document.getElementById(uri_ns);
+                    this.$refs[new_species][0].setFlashFlag(true);
+                    es.scrollIntoView();
+                    es.style.animation = 'none';
+                    es.offsetHeight; /* trigger reflow */
+                    es.style.animation = null; 
+                    return;
+                }
+
                 console.log(new_species);
-                this.moths.unshift({"species": new_species, "recent": 0, "count": 0});
+                var species_object = {
+                    "species": new_species, 
+                    "recent": 0,
+                    "orig_count": 0, 
+                    "count": 0, 
+                    "virgin": true, 
+                    "updated": false, 
+                    trap: false,
+                    location: false,
+                    recorder: false,
+                };
+                this.moths.unshift(species_object);
+
+                // Add species to sessionStorage
+                cache_update_species(species_object);
             },
             formatDate: function(date) {
                 var d = new Date(date),
@@ -188,6 +382,15 @@
                     day = '0' + day;
 
                 return [year, month, day].join('-');
+            },
+            jumpDate: function(){
+                console.log("Date picker", this.this_date);
+                window.location.href = "/survey/" + this.this_date;
+            },
+            detailHandler: function(event){
+                console.log("Recevied event", event)
+                this.detail_options[event.name].default = event.value;
+
             }
         },
         computed: {
@@ -209,7 +412,17 @@
                 ms = tdy.getTime();
                 ms += 24*60*60*1000;
                 return "/survey/"+this.formatDate(ms);
-            }
+            },
+            get_today_str: function(){
+                    var today = new Date();
+                    var dd = String(today.getDate()).padStart(2, '0');
+                    var mm = String(today.getMonth() + 1).padStart(2, '0'); //January is 0!
+                    var yyyy = today.getFullYear();
+
+                    today_str = yyyy + '-' + mm + '-' + dd;
+                    return today_str;
+            },
+            
         }
         
         
@@ -218,12 +431,24 @@
     // On load we want to combine the likely moths from the manifest and the recently seen moths.
     // This combination is not reactive so can be done once on load. 
 
-    manifest_moths = recent_moths;
+    manifest_moths = recent_moths;  // From manifest.js
+    console.log("records: ", {{!records}})
     captured_moths = {{!records}};
+    console.log("Captured Moths: ", captured_moths)
     // combine manifest_moths and captured moths
     var all_moths = []
     // First add recently seen species from the manifest
-    manifest_moths.forEach(function(item, index){all_moths.push(item)});
+    manifest_moths.forEach(function(item, index){
+            item.virgin = false;
+            item.updated = false;
+            item.recorder = false;
+            item.trap = false;
+            item.location = false;
+            item.count = 0;
+            item.orig_count = 0;
+            all_moths.push(item);
+        }
+    );
     
     // Now add anything already recorded for this date, add if not a recent species, and update
     // record if it already exists.
@@ -235,14 +460,78 @@
             console.log("Found duplicate record for " + item.species + " at: " + first_match);
             // Update record only if the record is null
             all_moths[first_match].count = item.count;
+            all_moths[first_match].orig_count = item.count;
+            all_moths[first_match].location = item.location;
+            all_moths[first_match].recorder = item.recorder;
+            all_moths[first_match].trap = item.trap;
+
         // else add to list
         } else {
             all_moths.push(item);
         }
     });
 
-    // Finally sort
-    vm.moths = all_moths.sort(function(i1, i2){return i1.species.localeCompare(i2.species)});      
+    // Now ensure the list is sorted
+    all_moths.sort(function(i1, i2){return i1.species.localeCompare(i2.species)});
+
+    // Now we can check for anything stored in the browser cache.
+    var record_cache = JSON.parse(sessionStorage.getItem("{{!dash_date_str}}"));
+    if (record_cache == null){
+        record_cache = {};
+    } else {
+        console.log("Retrieved sessionStorage", record_cache);
+        Object.entries(record_cache).forEach(function(kv, index){
+            var mname = kv[0];
+            var mobj = kv[1];
+            console.log(mobj);
+
+            // If exists - find index and update record
+            first_match = all_moths.findIndex(function(v){return (v.species == mname)});
+            if (first_match !== -1) {
+                // Find index
+                console.log("Found existing record for " + mname + " at: " + first_match);
+                // Update record only if the record is null
+                all_moths[first_match] = mobj;
+            // else add to list
+            } else {
+                all_moths.unshift(mobj);
+            }
+        });
+    }
+    
+    // Inject into the app
+    vm.moths = all_moths;      
+
+    // Finally recover visibility details
+    var detail_cache = JSON.parse(localStorage.getItem("detail_cache"));
+    if (detail_cache != null){
+        /* vm.detail_options = detail_cache;
+        */
+        Object.entries(detail_cache).forEach(function(item, index){
+            console.log("Cache item", item);
+            option_name = item[0];
+            hidden = item[1].hidden;
+            console.log("Recover vis:", option_name, ": ", hidden);
+            if (hidden === false){
+                vm.detail_options[option_name].hidden = hidden;
+            }
+
+            // If a default location has been cached on this browser, use this to over-ride the settings
+            browser_default = item[1].default;
+            console.log("Browser default [", option_name,"] = ", browser_default);
+            console.log("Options allowed: ", vm.detail_options[option_name].list);
+            if (vm.detail_options[option_name].list.includes(browser_default)){
+                console.log("Overriding default [",vm.detail_options[option_name].default, "] with ", browser_default);
+                vm.detail_options[option_name].default = browser_default;
+            } else {
+                console.log("Default no longer valid - reverting to: ", vm.detail_options[option_name].default)
+            }
+
+       })
+    }
+    
+
+
 
 </script>
 
